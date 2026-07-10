@@ -28,6 +28,8 @@ CELL = 14
 GAP = 2
 NIBBLE_GAP = 6
 BITS_PER_ROW = 32
+INDEX_H = 12  # strip below each cell row for bit-index labels
+ROW_H = CELL + GAP + INDEX_H
 
 
 class BitGrid(QWidget):
@@ -41,14 +43,14 @@ class BitGrid(QWidget):
         self.word_size = 64
         self.value = 0
         self.enabled_look = True
-        self.setMinimumHeight(2 * (CELL + GAP) + 8)
+        self.setMinimumHeight(2 * ROW_H + 8)
 
     def set_state(self, value: int, word_size: int, enabled: bool) -> None:
         self.value = value
         self.word_size = word_size
         self.enabled_look = enabled
         rows = (word_size + BITS_PER_ROW - 1) // BITS_PER_ROW
-        self.setMinimumHeight(rows * (CELL + GAP) + 8)
+        self.setMinimumHeight(rows * ROW_H + 8)
         self.update()
 
     def set_palette(self, palette: Palette) -> None:
@@ -61,14 +63,14 @@ class BitGrid(QWidget):
         row, col = divmod(pos, BITS_PER_ROW)
         nibble_gaps = col // 4
         x = 4 + col * (CELL + GAP) + nibble_gaps * NIBBLE_GAP
-        y = 4 + row * (CELL + GAP)
+        y = 4 + row * ROW_H
         return QRectF(x, y, CELL, CELL)
 
     def sizeHint(self) -> QSize:
         cols = min(self.word_size, BITS_PER_ROW)
         rows = (self.word_size + BITS_PER_ROW - 1) // BITS_PER_ROW
         width = 8 + cols * (CELL + GAP) + (cols // 4) * NIBBLE_GAP
-        return QSize(width, rows * (CELL + GAP) + 8)
+        return QSize(width, rows * ROW_H + 8)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -83,6 +85,16 @@ class BitGrid(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(on if set_ else off)
             painter.drawRoundedRect(rect, 2, 2)
+        # Bit-index labels under each nibble's MSB cell (63, 59, … 3), plus bit 0.
+        label_font = painter.font()
+        label_font.setPixelSize(9)
+        painter.setFont(label_font)
+        painter.setPen(QColor(self.palette_tokens.muted))
+        for bit in range(self.word_size):
+            if bit % 4 == 3 or bit == 0:
+                cell = self._cell_rect(bit)
+                label_rect = QRectF(cell.left() - GAP, cell.bottom() + 1, CELL + 2 * GAP, INDEX_H)
+                painter.drawText(label_rect, Qt.AlignmentFlag.AlignHCenter, str(bit))
         painter.end()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
