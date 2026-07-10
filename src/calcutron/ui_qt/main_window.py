@@ -216,12 +216,13 @@ class MainWindow(QMainWindow):
         text = self.input.text()
         if not text.strip():
             self._set_preview(" ", error=False)
+            self._panel_follow(self.session.ans)  # back to the last result
             return
         try:
             outcome = self.session.preview(text)
         except IncompleteError:
             self._set_preview("…", error=False)
-            return
+            return  # keep the panel steady while typing continues
         except CalcError as exc:
             marker = "·" * exc.span.start + "^"
             self._set_preview(f"{marker}  {exc.message}", error=True)
@@ -240,6 +241,16 @@ class MainWindow(QMainWindow):
             self._set_preview(outcome.normalized, error=False)
         else:
             self._set_preview(f"{outcome.normalized} = {result}", error=False)
+        self._panel_follow(outcome.value)
+
+    def _panel_follow(self, value: object) -> None:
+        """Point the integer panel at a previewed/committed value (or grey it)."""
+        number = getattr(value, "number", None)
+        self.intview.show_value(
+            number if isinstance(number, int) else None,
+            self.session.word_size,
+            self.session.signed,
+        )
 
     def _set_preview(self, text: str, error: bool) -> None:
         self.preview.setText(text)

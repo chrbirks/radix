@@ -106,6 +106,26 @@ def test_word_size_cycling_is_display_only(qtbot, window: MainWindow) -> None:  
     assert window.intview.rows["HEX"][1].text() == "0xFFFF"
 
 
+def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.input.setText("0xAB << 4")
+    window._update_preview()
+    assert window.intview.active
+    assert window.intview.rows["HEX"][1].text().endswith("0AB0")  # before Enter
+
+    window.input.setText("sin(1)")
+    window._update_preview()
+    assert not window.intview.active  # float greys the panel
+
+    window.input.setText("0xAB <<")  # incomplete: panel holds its last state
+    window._update_preview()
+    assert not window.intview.active
+
+    _submit(qtbot, window, "0xFF")
+    window.input.setText("")
+    window._update_preview()
+    assert window.intview.rows["HEX"][1].text().endswith("00FF")  # falls back to ans
+
+
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     grid = window.intview.grid_widget
     grid.resize(200, 100)  # fits one byte group per row
