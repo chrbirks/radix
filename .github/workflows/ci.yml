@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint
+        run: uv run ruff check src tests
+
+      - name: Type-check
+        run: uv run mypy
+
+      - name: Qt runtime libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
+
+      - name: Tests
+        run: uv run pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Qt runtime libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
+
+      - name: Freeze with PyInstaller (onedir)
+        run: uv run pyinstaller packaging/calcutron.spec --distpath dist --workpath build --noconfirm
+        # NOTE: keep PySide6 and PyInstaller pinned together (uv.lock); Qt point
+        # releases have broken PyInstaller hooks before.
+
+      - name: Smoke-test frozen binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          out="$(QT_QPA_PLATFORM=offscreen ./dist/calcutron/calcutron -e '0xFF << 2')"
+          echo "$out"
+          echo "$out" | grep -q '1020'
+
+      - name: Smoke-test frozen binary (Windows)
+        if: runner.os == 'Windows'
+        # The exe is windowed (console=false), so stdout is discarded; the
+        # smoke test asserts the exit code.
+        run: ./dist/calcutron/calcutron.exe -e '0xFF << 2'
+        shell: bash
+
+      - name: Package tarball (Linux)
+        if: runner.os == 'Linux'
+        run: tar -C dist -czf calcutron-linux-x86_64.tar.gz calcutron
+
+      - name: Package zip (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/calcutron -DestinationPath calcutron-windows-x86_64.zip
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcutron-${{ runner.os }}
+          path: |
+            calcutron-*.tar.gz
+            calcutron-*.zip

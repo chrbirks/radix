@@ -1,0 +1,295 @@
+"""Golden-table tests: the executable spec for the engine.
+
+Each case is (input, expected) evaluated on a fresh default session
+(64-bit, unsigned, radians, auto notation) unless a settings dict is given.
+`expected` compares against the formatted primary text, so these cases pin
+both semantics and display.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from calcutron.engine.errors import CalcError, EvalError, IncompleteError, LexError, ParseError
+from calcutron.session import Session
+
+
+def run(text: str, **settings: object) -> str:
+    session = Session()
+    for key, value in settings.items():
+        setattr(session, key, value)
+    outcome = session.evaluate(text)
+    assert outcome.value is not None
+    return session.format_value(outcome.value)
+
+
+# -- literals and suffixes ----------------------------------------------------
+
+LITERALS = [
+    ("123", "123"),
+    ("1.5", "1.5"),
+    ("1.5e-9", "1.5e-9"),
+    ("1.5E-9", "1.5e-9"),
+    ("0.1 + 0.2", "0.3"),  # no float64 artifacts
+    ("0xFF", "255"),
+    ("0b1010", "10"),
+    ("0o17", "15"),
+    ("0xFFFF_0000", "4294901760"),
+    ("1_000_000", "1000000"),
+    (".5", "0.5"),
+    ("4k", "4000"),
+    ("4.7k", "4700"),
+    ("100n", "1e-7"),
+    ("2p", "2e-12"),
+    ("3.3M", "3300000"),
+    ("1T", "1000000000000"),
+    ("32Ki", "32768"),
+    ("4Mi", "4194304"),
+    ("2Gi", "2147483648"),
+    ("1.5Ki", "1536"),
+    ("2pi", "6.28318530718"),  # suffix run 'pi' is an identifier, not p·i
+    ("2e", "5.43656365692"),  # e as constant when not an exponent
+    ("2e3", "2000"),
+    ("1.5e+2", "150"),
+]
+
+
+@pytest.mark.parametrize(("text", "expected"), LITERALS)
+def test_literals(text: str, expected: str) -> None:
+    assert run(text) == expected
+
+
+# -- HDL literals ---------------------------------------------------------------
+
+HDL = [
+    ("8'hFF", "255"),
+    ("12'b1010_1010", "170"),
+    ("4'd9", "9"),
+    ("8'o17", "15"),
+    ('x"FF"', "255"),
+    ('x"DEAD_BEEF"', "3735928559"),
+]
+
+
+@pytest.mark.parametrize(("text", "expected"), HDL)
+def test_hdl_literals(text: str, expected: str) -> None:
+    assert run(text) == expected
+
+
+def test_hdl_literal_width_attached() -> None:
+    session = Session()
+    outcome = session.evaluate("8'hFF")
+    assert outcome.value is not None and outcome.value.declared_width == 8
+    outcome = session.evaluate('x"FF"')
+    assert outcome.value is not None and outcome.value.declared_width == 8
+
+
+def test_hdl_value_must_fit_width() -> None:
+    with pytest.raises(LexError):
+        run("8'h1FF")
+
+
+# -- precedence and operators ---------------------------------------------------
+
+PRECEDENCE = [
+    ("1 + 2 * 3", "7"),
+    ("2**10", "1024"),
+    ("2**-2", "0.25"),
+    ("-2**2", "-4"),  # ** binds tighter than unary minus
+    ("2**3**2", "512"),  # right-associative
+    ("2^10", "8"),  # XOR, never power
+    ("1 | 2 ^ 3 & 4 << 5", "3"),  # | < ^ < & < <<  →  1 | (2 ^ (3 & (4<<5)))
+    ("1 + 2 << 3", "24"),  # shifts bind looser than +
+    ("7 & 3 + 1", "4"),  # & binds looser than +
+    ("10 / 4", "2.5"),
+    ("10 / 2", "5"),  # exact division stays int
+    ("7 // 2", "3"),
+    ("-7 // 2", "-3"),  # truncation toward zero
+    ("7 // -2", "-3"),
+    ("-7 % 2", "-1"),  # sign of dividend
+    ("7 % -2", "1"),
+    ("2pi", "6.28318530718"),
+    ("3(1+1)", "6"),
+    ("(1+1)(2+2)", "8"),
+    ("1/2pi", "1.57079632679"),  # implicit mult binds like *
+    ("2 3", "6"),  # adjacency with space is still implicit mult
+    ("+5", "5"),
+    ("--5", "5"),
+    ("~0", "18446744073709551615"),
+    ("~0", "255", {"word_size": 8}),
+]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected", "settings"),
+    [c if len(c) == 3 else (*c, {}) for c in PRECEDENCE],
+)
+def test_precedence(text: str, expected: str, settings: dict[str, object]) -> None:
+    assert run(text, **settings) == expected
+
+
+# -- word size, signedness, masking ----------------------------------------------
+
+BITS = [
+    ("0xFF << 2", "1020", {}),
+    ("0xFF << 2", "252", {"word_size": 8}),  # wraps register-like
+    ("1 << 100", "0", {"word_size": 64}),
+    ("0x80 >> 4", "8", {"word_size": 8}),  # logical shift when unsigned
+    ("0x80 >> 4", "248", {"word_size": 8, "signed": True}),  # arithmetic shift
+    ("-1 & 0xFF", "255", {}),  # negative operand wraps into the word first
+    ("4.7k * 2", "9400", {"word_size": 8}),  # plain arithmetic is never masked
+]
+
+
+@pytest.mark.parametrize(("text", "expected", "settings"), BITS)
+def test_bit_semantics(text: str, expected: str, settings: dict[str, object]) -> None:
+    assert run(text, **settings) == expected
+
+
+def test_bit_op_on_float_is_error() -> None:
+    with pytest.raises(EvalError, match="integer"):
+        run("1.5 & 3")
+    with pytest.raises(EvalError, match="integer"):
+        run("~1.5")
+    session = Session()
+    session.evaluate("4.7n")
+    with pytest.raises(EvalError, match="integer"):
+        session.evaluate("ans << 2")
+
+
+# -- functions and constants ------------------------------------------------------
+
+def test_trig_radians_and_degrees() -> None:
+    assert run("sin(pi/2)") == "1"
+    assert run("sin(90)", angle_deg=True) == "1"
+    assert run("asin(1)", angle_deg=True) == "90"
+    assert run("cos(0)") == "1"
+
+
+def test_logs_and_roots() -> None:
+    assert run("log(1000)") == "3"
+    assert run("ln(e)") == "1"
+    assert run("log2(1024)") == "10"
+    assert run("sqrt(16)") == "4"
+    assert run("floor(2.7)") == "2"
+    assert run("ceil(2.1)") == "3"
+    assert run("round(2.5)") == "2"  # nint rounds half to even
+    assert run("abs(-4)") == "4"
+
+
+def test_domain_errors() -> None:
+    for text in ("sqrt(-1)", "asin(2)", "log(-1)", "ln(0)"):
+        with pytest.raises(EvalError):
+            run(text)
+
+
+def test_operand_guards() -> None:
+    with pytest.raises(EvalError):
+        run("10**10**10")
+    with pytest.raises(EvalError):
+        run("1 << 10**9")
+    with pytest.raises(EvalError, match="zero"):
+        run("1/0")
+    with pytest.raises(EvalError, match="zero"):
+        run("1//0")
+
+
+# -- variables and ans -------------------------------------------------------------
+
+def test_variables_and_ans_flow() -> None:
+    session = Session()
+    outcome = session.evaluate("x = 4.7k")
+    assert outcome.kind == "assign" and outcome.target == "x"
+    assert session.evaluate("x * 2").primary_text == "9400"
+    assert session.evaluate("ans / 2").primary_text == "4700"
+    session.evaluate("y = x + 300")
+    assert session.evaluate("y").primary_text == "5000"
+
+
+def test_ans_without_history_is_error() -> None:
+    with pytest.raises(EvalError, match="no previous result"):
+        Session().evaluate("ans")
+
+
+def test_reserved_names_cannot_be_assigned() -> None:
+    session = Session()
+    for name in ("ans", "pi", "e", "sin", "help", "clear"):
+        with pytest.raises(EvalError, match="reserved"):
+            session.evaluate(f"{name} = 1")
+
+
+def test_variable_k_needs_explicit_multiply() -> None:
+    session = Session()
+    session.evaluate("k = 5")
+    assert session.evaluate("4k").primary_text == "4000"  # suffix always wins
+    assert session.evaluate("4*k").primary_text == "20"
+
+
+def test_undefined_variable_message() -> None:
+    with pytest.raises(EvalError, match="undefined variable 'pk'"):
+        run("2pk")
+
+
+def test_clear_wipes_state() -> None:
+    session = Session()
+    session.evaluate("x = 1")
+    session.evaluate("clear")
+    with pytest.raises(EvalError):
+        session.evaluate("x")
+    with pytest.raises(EvalError):
+        session.evaluate("ans")
+
+
+def test_preview_has_no_side_effects() -> None:
+    session = Session()
+    session.preview("x = 42")
+    with pytest.raises(EvalError):
+        session.evaluate("x")
+    session.preview("1 + 1")
+    with pytest.raises(EvalError):
+        session.evaluate("ans")
+
+
+# -- errors: spans, incompleteness --------------------------------------------------
+
+def test_parse_error_has_caret_position() -> None:
+    try:
+        run("1 + )")
+    except ParseError as exc:
+        assert exc.span.start == 4
+    else:  # pragma: no cover
+        pytest.fail("expected ParseError")
+
+
+def test_incomplete_input_is_distinguished() -> None:
+    for text in ("1 +", "(1 + 2", "sin(", "2 **"):
+        with pytest.raises(IncompleteError):
+            run(text)
+    with pytest.raises(ParseError):
+        run("1 + ) 2")
+
+
+def test_assignment_only_at_line_start() -> None:
+    with pytest.raises(CalcError):
+        run("1 + (x = 2)")
+
+
+# -- slicing ---------------------------------------------------------------------
+
+def test_bit_slicing() -> None:
+    assert run("0xAB[7:4]") == "10"
+    assert run("0xAB[3:0]") == "11"
+    assert run("0xAB[3]") == "1"
+    assert run("0xAB[2]") == "0"
+    session = Session()
+    session.evaluate("x = 0xFF")
+    assert session.evaluate("x[7:4]").primary_text == "15"
+
+
+def test_slice_range_errors() -> None:
+    with pytest.raises(EvalError, match="invalid bit range"):
+        run("0xAB[0:4]")
+    with pytest.raises(EvalError, match="outside"):
+        run("0xAB[8:0]", word_size=8)
+    with pytest.raises(EvalError, match="integer"):
+        run("1.5[3]")

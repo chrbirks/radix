@@ -1,0 +1,220 @@
+"""FPGA/HDL toolkit functions: bit utilities, clock helpers, fixed-point Qm.n.
+
+Registered into the same FUNCTIONS table as the math functions, so help text
+and evaluation stay in one place. Handlers may return a plain number or a
+full Value when they carry display metadata (declared width, SI-suffix
+preference, quantization-error note).
+"""
+
+from __future__ import annotations
+
+import mpmath
+
+from calcutron.engine.functions import (
+    EvalContext,
+    FunctionDomainError,
+    Handler,
+    _register,
+)
+from calcutron.engine.values import Number, Value
+
+MAX_MASK_BITS = 1_000_000
+
+
+def _int_arg(args: list[Number], i: int, what: str) -> int:
+    x = args[i]
+    if isinstance(x, int):
+        return x
+    raise FunctionDomainError(f"{what}: argument {i + 1} must be an integer")
+
+
+def _word_mask(ctx: EvalContext) -> int:
+    return (1 << ctx.word_size) - 1
+
+
+# -- bit utilities -------------------------------------------------------------
+
+
+def _clog2(args: list[Number], ctx: EvalContext) -> Number:
+    n = _int_arg(args, 0, "clog2")
+    if n <= 0:
+        raise FunctionDomainError("clog2: argument must be positive")
+    return (n - 1).bit_length()
+
+
+def _flog2(args: list[Number], ctx: EvalContext) -> Number:
+    n = _int_arg(args, 0, "flog2")
+    if n <= 0:
+        raise FunctionDomainError("flog2: argument must be positive")
+    return n.bit_length() - 1
+
+
+def _mask_fn(args: list[Number], ctx: EvalContext) -> Number:
+    n = _int_arg(args, 0, "mask")
+    if not 0 <= n <= MAX_MASK_BITS:
+        raise FunctionDomainError(f"mask: width must be 0..{MAX_MASK_BITS}")
+    return (1 << n) - 1
+
+
+def _bit_fn(args: list[Number], ctx: EvalContext) -> Number:
+    n = _int_arg(args, 0, "bit")
+    if not 0 <= n <= MAX_MASK_BITS:
+        raise FunctionDomainError(f"bit: index must be 0..{MAX_MASK_BITS}")
+    return 1 << n
+
+
+def _popcount(args: list[Number], ctx: EvalContext) -> Number:
+    return (_int_arg(args, 0, "popcount") & _word_mask(ctx)).bit_count()
+
+
+def _parity(args: list[Number], ctx: EvalContext) -> Number:
+    return (_int_arg(args, 0, "parity") & _word_mask(ctx)).bit_count() & 1
+
+
+def _revbits(args: list[Number], ctx: EvalContext) -> Number:
+    v = _int_arg(args, 0, "revbits")
+    width = ctx.word_size if len(args) == 1 else _int_arg(args, 1, "revbits")
+    if not 1 <= width <= 1024:
+        raise FunctionDomainError("revbits: width must be 1..1024")
+    v &= (1 << width) - 1
+    result = 0
+    for _ in range(width):
+        result = (result << 1) | (v & 1)
+        v >>= 1
+    return result
+
+
+def _byteswap(width: int) -> Handler:
+    def handler(args: list[Number], ctx: EvalContext) -> Number:
+        v = _int_arg(args, 0, f"byteswap{width}") & ((1 << width) - 1)
+        raw = v.to_bytes(width // 8, "big")
+        return int.from_bytes(raw, "little")
+
+    return handler
+
+
+def _sext(args: list[Number], ctx: EvalContext) -> Number:
+    v = _int_arg(args, 0, "sext")
+    bits = _int_arg(args, 1, "sext")
+    if not 1 <= bits <= ctx.word_size:
+        raise FunctionDomainError(f"sext: bits must be 1..{ctx.word_size} (the word size)")
+    v &= (1 << bits) - 1
+    if v >> (bits - 1):  # sign bit set: fill up to the word size
+        v |= _word_mask(ctx) ^ ((1 << bits) - 1)
+    return v
+
+
+def _zext(args: list[Number], ctx: EvalContext) -> Number:
+    v = _int_arg(args, 0, "zext")
+    bits = _int_arg(args, 1, "zext")
+    if not 1 <= bits <= ctx.word_size:
+        raise FunctionDomainError(f"zext: bits must be 1..{ctx.word_size} (the word size)")
+    return v & ((1 << bits) - 1)
+
+
+def _rotate(left: bool) -> Handler:
+    name = "rol" if left else "ror"
+
+    def handler(args: list[Number], ctx: EvalContext) -> Number:
+        v = _int_arg(args, 0, name) & _word_mask(ctx)
+        n = _int_arg(args, 1, name) % ctx.word_size
+        w = ctx.word_size
+        if not left:
+            n = (w - n) % w
+        return ((v << n) | (v >> (w - n))) & _word_mask(ctx) if n else v
+
+    return handler
+
+
+# -- clock & unit helpers --------------------------------------------------------
+
+
+def _reciprocal(args: list[Number], what: str) -> mpmath.mpf:
+    x = mpmath.mpf(args[0])
+    if x == 0:
+        raise FunctionDomainError(f"{what}: argument must be non-zero")
+    return 1 / x
+
+
+def _period(args: list[Number], ctx: EvalContext) -> Value:
+    return Value(_reciprocal(args, "period"), prefer_si=True)
+
+
+def _freq(args: list[Number], ctx: EvalContext) -> Value:
+    return Value(_reciprocal(args, "freq"), prefer_si=True)
+
+
+# -- fixed-point Qm.n --------------------------------------------------------------
+
+
+def _q_format(args: list[Number], what: str) -> tuple[int, int, int]:
+    m = _int_arg(args, 1, what)
+    n = _int_arg(args, 2, what)
+    if m < 0 or n < 0 or m + n == 0 or m + n > 128:
+        raise FunctionDomainError(f"{what}: need 0 <= m, n and 0 < m+n <= 128")
+    return m, n, m + n
+
+
+def _fix(args: list[Number], ctx: EvalContext) -> Value:
+    """Real → Qm.n two's-complement raw value (round to nearest)."""
+    m, n, total = _q_format(args, "fix")
+    x = mpmath.mpf(args[0])
+    scaled = int(mpmath.nint(x * (1 << n)))
+    lo, hi = -(1 << (total - 1)), (1 << (total - 1)) - 1
+    if not lo <= scaled <= hi:
+        raise FunctionDomainError(
+            f"fix: {mpmath.nstr(x, 8)} does not fit Q{m}.{n} (range {lo}..{hi} raw)"
+        )
+    raw = scaled & ((1 << total) - 1)
+    quantized = mpmath.mpf(scaled) / (1 << n)
+    err = x - quantized
+    note = f"Q{m}.{n}, quantization error = {mpmath.nstr(err, 3)}"
+    return Value(raw, declared_width=total, note=note)
+
+
+def _unfix(args: list[Number], ctx: EvalContext) -> Value:
+    """Qm.n two's-complement raw value → real."""
+    raw = _int_arg(args, 0, "unfix")
+    m, n, total = _q_format(args, "unfix")
+    raw &= (1 << total) - 1
+    if raw >> (total - 1):
+        raw -= 1 << total
+    return Value(mpmath.mpf(raw) / (1 << n), note=f"from Q{m}.{n}")
+
+
+_TOOLKIT: list[tuple[str, tuple[int, int], str, str, Handler]] = [
+    ("clog2", (1, 1), "Ceiling log2 — address width for N entries.", "clog2(300) = 9", _clog2),
+    ("flog2", (1, 1), "Floor log2 — index of the highest set bit.", "flog2(300) = 8", _flog2),
+    ("mask", (1, 1), "N low bits set: (1<<n)-1.", "mask(12) = 0xFFF", _mask_fn),
+    ("bit", (1, 1), "Single set bit: 1<<n.", "bit(7) = 0x80", _bit_fn),
+    ("popcount", (1, 1), "Number of set bits (within the word size).",
+     "popcount(0xF0F0)", _popcount),
+    ("parity", (1, 1), "XOR of all bits: 1 if odd number set.", "parity(0b1011) = 1", _parity),
+    ("revbits", (1, 2), "Reverse bit order in the word (or in `width` bits).",
+     "revbits(0b1101, 4) = 0b1011", _revbits),
+    ("byteswap16", (1, 1), "Swap byte order in 16 bits (endianness).",
+     "byteswap16(0x1234) = 0x3412", _byteswap(16)),
+    ("byteswap32", (1, 1), "Swap byte order in 32 bits (endianness).",
+     "byteswap32(0xDEADBEEF)", _byteswap(32)),
+    ("byteswap64", (1, 1), "Swap byte order in 64 bits (endianness).",
+     "byteswap64(0x0123456789ABCDEF)", _byteswap(64)),
+    ("sext", (2, 2), "Sign-extend the low `bits` up to the word size.", "sext(0xFF, 8)", _sext),
+    ("zext", (2, 2), "Zero-extend: keep only the low `bits`.", "zext(0x1FF, 8) = 0xFF", _zext),
+    ("rol", (2, 2), "Rotate left within the word size.", "rol(0x80, 1)", _rotate(True)),
+    ("ror", (2, 2), "Rotate right within the word size.", "ror(1, 1)", _rotate(False)),
+    ("period", (1, 1), "Clock period from frequency: 1/f, shown with SI suffix.",
+     "period(100M) = 10n", _period),
+    ("freq", (1, 1), "Frequency from period: 1/t, shown with SI suffix.",
+     "freq(8n) = 125M", _freq),
+    ("fix", (3, 3), "Real → fixed-point Qm.n raw value (two's complement).",
+     "fix(0.7071, 1, 15) = 0x5A82", _fix),
+    ("unfix", (3, 3), "Fixed-point Qm.n raw value → real.", "unfix(0x5A82, 1, 15)", _unfix),
+]
+
+
+def register_fpga_functions() -> None:
+    for name, arity, summary, example, handler in _TOOLKIT:
+        _register(name, arity, summary, example, handler)
+
+
+register_fpga_functions()
