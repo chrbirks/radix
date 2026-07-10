@@ -138,13 +138,18 @@ def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: i
 
 
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from calcutron.ui_qt.bit_panel import BYTE_WIDTH
+
     grid = window.intview.grid_widget
-    grid.resize(200, 100)  # fits one byte group per row
+    narrow = BYTE_WIDTH + 12  # fits exactly one byte group per row
+    grid.resize(narrow, 100)
     grid.set_state(0, 32, True)
     assert grid._bits_per_row() == 8
     assert grid._rows() == 4
     # Every bit must land inside the widget's width.
-    assert all(grid._cell_rect(b).right() <= 200 for b in range(32))
-    grid.resize(600, 100)
+    assert all(grid._cell_rect(b).right() <= narrow for b in range(32))
+    wide = 4 * BYTE_WIDTH + 12  # fits all four byte groups on one row
+    grid.resize(wide, 100)
     assert grid._bits_per_row() == 32
     assert grid._rows() == 1
+    assert all(grid._cell_rect(b).right() <= wide for b in range(32))

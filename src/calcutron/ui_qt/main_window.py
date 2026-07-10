@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         self.last_result_text = ""
 
         self.setWindowTitle("Calcutron-9000")
-        self.setMinimumSize(420, 480)
+        self.setMinimumSize(520, 600)
 
         root = QWidget()
         root.setObjectName("root")
