@@ -122,4 +122,4 @@ class HistoryDelegate(QStyledItemDelegate):
     def sizeHint(
         self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
     ) -> QSize:
-        return QSize(option.rect.width(), 46)
+        return QSize(option.rect.width(), 52)

@@ -74,7 +74,7 @@ def stylesheet(p: Palette, mono: str) -> str:
     return f"""
     * {{
         font-family: "{mono}";
-        font-size: 13px;
+        font-size: 15px;
     }}
     QMainWindow, QWidget#root {{
         background: {p.background};
@@ -91,14 +91,14 @@ def stylesheet(p: Palette, mono: str) -> str:
         border: none;
         border-bottom: 1px solid {p.hairline};
         padding: 10px 12px;
-        font-size: 16px;
+        font-size: 18px;
         selection-background-color: {p.accent};
         selection-color: {p.accent_text};
     }}
     QLabel#preview {{
         color: {p.muted};
         padding: 2px 12px 8px 12px;
-        font-size: 12px;
+        font-size: 14px;
     }}
     QLabel#preview[state="error"] {{
         color: {p.error};
@@ -109,11 +109,11 @@ def stylesheet(p: Palette, mono: str) -> str:
     }}
     QLabel.baseName {{
         color: {p.muted};
-        font-size: 11px;
+        font-size: 13px;
     }}
     QLabel.baseValue {{
         color: {p.text};
-        font-size: 13px;
+        font-size: 15px;
     }}
     QLabel.baseValue[dimmed="true"], QLabel.baseName[dimmed="true"] {{
         color: {p.muted};
@@ -124,7 +124,7 @@ def stylesheet(p: Palette, mono: str) -> str:
         border: 1px solid {p.hairline};
         border-radius: 3px;
         padding: 1px 6px;
-        font-size: 10px;
+        font-size: 12px;
     }}
     QPushButton.copyBtn:hover {{
         color: {p.accent};
@@ -134,7 +134,7 @@ def stylesheet(p: Palette, mono: str) -> str:
         background: {p.background};
         color: {p.muted};
         border-top: 1px solid {p.hairline};
-        font-size: 11px;
+        font-size: 13px;
     }}
     QStatusBar::item {{ border: none; }}
     QLabel.statusItem {{
@@ -149,7 +149,7 @@ def stylesheet(p: Palette, mono: str) -> str:
         color: {p.text};
         border: none;
         padding: 12px;
-        font-size: 12px;
+        font-size: 14px;
     }}
     QScrollBar:vertical {{
         background: transparent;

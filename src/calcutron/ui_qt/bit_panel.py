@@ -27,7 +27,7 @@ from calcutron.ui_qt.theme import Palette
 CELL = 14
 GAP = 2
 NIBBLE_GAP = 6
-INDEX_H = 12  # strip below each cell row for bit-index labels
+INDEX_H = 14  # strip below each cell row for bit-index labels
 ROW_H = CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
 
@@ -105,7 +105,7 @@ class BitGrid(QWidget):
             painter.drawRoundedRect(rect, 2, 2)
         # Bit-index labels under each nibble's MSB cell (63, 59, … 3), plus bit 0.
         label_font = painter.font()
-        label_font.setPixelSize(9)
+        label_font.setPixelSize(11)
         painter.setFont(label_font)
         painter.setPen(QColor(self.palette_tokens.muted))
         for bit in range(self.word_size):
