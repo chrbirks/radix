@@ -13,6 +13,11 @@ Disambiguation rules (the spec — see plan and tests):
 - HDL sized literals: ``8'hFF``, ``12'b1010_1010``, ``4'd9``, ``8'o17`` — the
   width is attached to the token for the bit panel; a value wider than the
   declared width is an error. VHDL hex strings ``x"FF"`` get width 4·digits.
+- Prefixed literals: ``hFF`` and ``xFF`` are hex, ``b1010`` is binary — an
+  identifier-shaped run counts as one of these only if everything after the
+  lowercase prefix is a valid digit of that base (plus ``_``). Like the SI
+  rule, the literal reading always wins, so ``b1`` or ``x0`` cannot be
+  variable names; ``bad`` or ``h2o`` are ordinary identifiers.
 
 Suffixed decimal literals are computed exactly via Fraction, so ``4.7k`` is the
 exact int 4700 and stays usable with bitwise operators.
@@ -197,6 +202,9 @@ class Lexer:
         run = self._take_while(_is_ident_cont)
         if run in ("x", "X") and self._peek() == '"':
             return self._vhdl_hex(start)
+        value = _prefixed_literal(run)
+        if value is not None:
+            return Token("NUMBER", run, Span(start, self.pos), value)
         return Token("IDENT", run, Span(start, self.pos))
 
     def _vhdl_hex(self, start: int) -> Token:
@@ -213,6 +221,19 @@ class Lexer:
         except ValueError as exc:
             raise LexError(f"malformed VHDL hex literal {text!r}", span) from exc
         return Token("NUMBER", text, span, value, declared_width=4 * len(clean))
+
+
+def _prefixed_literal(run: str) -> int | None:
+    """hFF / xFF (hex) or b1010 (binary), else None. Lowercase prefix only."""
+    if len(run) < 2:
+        return None
+    base = {"h": 16, "x": 16, "b": 2}.get(run[0])
+    if base is None or run[1] == "_":
+        return None
+    try:
+        return int(run[1:], base)
+    except ValueError:
+        return None
 
 
 def _apply_si_suffix(value: Number, suffix: str) -> Number:

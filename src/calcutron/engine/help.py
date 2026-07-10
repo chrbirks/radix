@@ -26,10 +26,12 @@ _BASICS = """\
 Type an expression and press Enter. Everything is keyboard-first — no buttons.
 
 Literals   123   1.5   1.5e-9   0xFF   0b1010   0o17   0xFFFF_0000
+           Prefixed: hFF = xFF = 0xFF   b1010 = 0b1010
            SI suffixes: 4.7k = 4700, 100n = 1e-7   (f p n u µ m k M G T)
            Binary prefixes: 32Ki = 32768   (Ki Mi Gi)
            HDL: 8'hFF   12'b1010_1010   4'd9   x"FF"
-           Note: 4k is always 4000 — write 4*k to multiply by a variable k.
+           Note: literals win over names — 4k is always 4000 (write 4*k for
+           a variable k) and b1/x0/hA cannot be variable names.
 Variables  x = 4.7k    then    x * 2      `ans` is the previous result.
 Integers   Results that are integers also show hex/dec/bin and the bit panel.
            Word size and signedness affect bit operators and that display only.

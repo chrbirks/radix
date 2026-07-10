@@ -30,6 +30,8 @@ binary — this is a known v1 limitation.
   9400
 > 32Ki                     binary prefixes: Ki Mi Gi
   32768
+> hFF + b1010              prefixed literals: hFF/xFF = 0xFF, b1010 = 0b1010
+  265
 > x = 8'hA5                Verilog/VHDL literals: 8'hFF, 12'b1010_1010, x"FF"
 > x[7:4]                   bit slicing and testing: x[3]
   10
@@ -48,6 +50,9 @@ binary — this is a known v1 limitation.
 Notable rules (all covered by tests):
 
 - `4k` is always the literal 4000 — multiplying by a variable `k` needs `4*k`.
+  Likewise `hFF`/`xFF`/`b1010` are always literals, so names like `b1` or `x0`
+  can't be variables (`bad`, `h2o` etc. still can — their tails aren't digits
+  of the base).
 - `2pi` is 2·π (implicit multiplication); implicit `*` binds exactly like
   explicit `*`, so `1/2pi` is (1/2)·π.
 - `e` is an exponent marker only directly before digits (`1.5e-9`); `2e` is 2·e.

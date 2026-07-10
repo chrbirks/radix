@@ -68,7 +68,30 @@ HDL = [
     ("8'o17", "15"),
     ('x"FF"', "255"),
     ('x"DEAD_BEEF"', "3735928559"),
+    # Prefixed literal forms
+    ("hFF", "255"),
+    ("xFF", "255"),
+    ("hDEAD_BEEF", "3735928559"),
+    ("b1010", "10"),
+    ("b1010_1010", "170"),
+    ("hFF + b1010", "265"),
+    ("h12[3:0]", "2"),
 ]
+
+
+def test_prefixed_literal_lookalikes_stay_identifiers() -> None:
+    # Tails that aren't digits of the base are ordinary (undefined) identifiers.
+    for name in ("bad", "h2o", "b102", "x", "h", "b"):
+        with pytest.raises(EvalError):
+            run(name)
+    session = Session()
+    session.evaluate("h2o = 3")  # assignable: not a literal shape
+    assert session.evaluate("h2o * 2").primary_text == "6"
+
+
+def test_prefixed_literal_shapes_are_not_assignable() -> None:
+    with pytest.raises(ParseError):
+        run("b1 = 5")  # b1 lexes as the literal 1
 
 
 @pytest.mark.parametrize(("text", "expected"), HDL)
