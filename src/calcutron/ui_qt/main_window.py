@@ -13,7 +13,6 @@ from PySide6.QtGui import QAction, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
-    QLineEdit,
     QListView,
     QMainWindow,
     QPlainTextEdit,
@@ -26,7 +25,9 @@ from calcutron.engine.help import general_help
 from calcutron.history.store import HistoryStore
 from calcutron.session import Session
 from calcutron.ui_qt.bit_panel import IntegerView
+from calcutron.ui_qt.highlight import ExprHighlighter
 from calcutron.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
+from calcutron.ui_qt.input_edit import InputEdit
 from calcutron.ui_qt.theme import Palette
 
 PREVIEW_DEBOUNCE_MS = 100
@@ -75,12 +76,13 @@ class MainWindow(QMainWindow):
         self.help_pane.setReadOnly(True)
         self.help_pane.hide()
 
-        self.input = QLineEdit()
+        self.input = InputEdit()
         self.input.setObjectName("input")
         self.input.setPlaceholderText("type an expression — help for the basics")
-        self.input.returnPressed.connect(self._evaluate)
+        self.input.submitted.connect(self._evaluate)
         self.input.textChanged.connect(self._schedule_preview)
         self.input.installEventFilter(self)
+        self.highlighter = ExprHighlighter(self.input.document(), palette)
 
         self.preview = QLabel(" ")
         self.preview.setObjectName("preview")
@@ -377,6 +379,7 @@ class MainWindow(QMainWindow):
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
         self.intview.set_palette(palette)
+        self.highlighter.set_palette(palette)
         self.history_view.viewport().update()
 
 

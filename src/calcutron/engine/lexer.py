@@ -259,3 +259,17 @@ def _apply_binary_suffix(value: Number, suffix: str) -> Number:
 
 def tokenize(text: str) -> list[Token]:
     return Lexer(text).tokens()
+
+
+def tokenize_prefix(text: str) -> list[Token]:
+    """Tokens of the longest valid prefix; never raises (for highlighting)."""
+    lexer = Lexer(text)
+    out: list[Token] = []
+    while True:
+        try:
+            tok = lexer._next()
+        except LexError:
+            return out
+        if tok.kind == "EOF":
+            return out
+        out.append(tok)

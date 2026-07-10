@@ -26,6 +26,9 @@ class Palette:
     error: str
     bit_on: str
     bit_off: str
+    syn_number: str
+    syn_function: str
+    syn_operator: str
 
 
 LIGHT = Palette(
@@ -39,6 +42,9 @@ LIGHT = Palette(
     error="#c92a2a",
     bit_on="#2563eb",
     bit_off="#d5dae1",
+    syn_number="#0550ae",
+    syn_function="#6f42c1",
+    syn_operator="#b35900",
 )
 
 DARK = Palette(
@@ -52,6 +58,9 @@ DARK = Palette(
     error="#ff6b6b",
     bit_on="#5b8def",
     bit_off="#3a4048",
+    syn_number="#79c0ff",
+    syn_function="#d2a8ff",
+    syn_operator="#e0af68",
 )
 
 MONO_FAMILY = "JetBrains Mono"
@@ -85,7 +94,7 @@ def stylesheet(p: Palette, mono: str) -> str:
         border-bottom: 1px solid {p.hairline};
         padding: 6px;
     }}
-    QLineEdit#input {{
+    QPlainTextEdit#input {{
         background: {p.surface};
         color: {p.text};
         border: none;

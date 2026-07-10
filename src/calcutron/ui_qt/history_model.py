@@ -16,6 +16,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
 
+from calcutron.ui_qt.highlight import classify, color_for
 from calcutron.ui_qt.theme import Palette
 
 EXPRESSION_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -98,13 +99,8 @@ class HistoryDelegate(QStyledItemDelegate):
         result_font.setBold(True)
 
         painter.setFont(expr_font)
-        painter.setPen(QColor(self.palette_tokens.muted))
         expr_rect = QRect(rect.left(), rect.top(), rect.width(), rect.height() // 2)
-        painter.drawText(
-            expr_rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            f"> {expression}",
-        )
+        self._draw_highlighted(painter, expr_rect, expression)
 
         painter.setFont(result_font)
         painter.setPen(QColor(self.palette_tokens.text))
@@ -118,6 +114,29 @@ class HistoryDelegate(QStyledItemDelegate):
             f"  {text}",
         )
         painter.restore()
+
+    def _draw_highlighted(self, painter: QPainter, rect: QRect, expression: str) -> None:
+        """Paint `> expression` with the same token colors as the input field."""
+        metrics = painter.fontMetrics()
+        flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        palette = self.palette_tokens
+        x = rect.left()
+
+        def draw(text: str, color: QColor) -> None:
+            nonlocal x
+            if not text:
+                return
+            painter.setPen(color)
+            painter.drawText(QRect(x, rect.top(), rect.right() - x, rect.height()), flags, text)
+            x += metrics.horizontalAdvance(text)
+
+        draw("> ", QColor(palette.muted))
+        pos = 0
+        for start, length, kind in classify(expression):
+            draw(expression[pos:start], QColor(palette.muted))  # whitespace/unlexed gaps
+            draw(expression[start : start + length], color_for(kind, palette))
+            pos = start + length
+        draw(expression[pos:], QColor(palette.muted))  # trailing unlexable rest
 
     def sizeHint(
         self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
