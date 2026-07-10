@@ -96,3 +96,24 @@ def test_status_bar_cycles_word_size(qtbot, window: MainWindow) -> None:  # type
     window._cycle_word_size()
     assert window.session.word_size == 8
     assert window.status_items["word"].text() == "8-bit"
+
+
+def test_word_size_cycling_is_display_only(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFFFF")
+    window._cycle_word_size()  # 64 -> 8: shows 0xFF
+    assert window.intview.rows["HEX"][1].text() == "0xFF"
+    window._cycle_word_size()  # 8 -> 16: upper bits must reappear
+    assert window.intview.rows["HEX"][1].text() == "0xFFFF"
+
+
+def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    grid = window.intview.grid_widget
+    grid.resize(200, 100)  # fits one byte group per row
+    grid.set_state(0, 32, True)
+    assert grid._bits_per_row() == 8
+    assert grid._rows() == 4
+    # Every bit must land inside the widget's width.
+    assert all(grid._cell_rect(b).right() <= 200 for b in range(32))
+    grid.resize(600, 100)
+    assert grid._bits_per_row() == 32
+    assert grid._rows() == 1

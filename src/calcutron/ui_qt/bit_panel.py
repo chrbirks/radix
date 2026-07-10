@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent
+from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -27,13 +27,18 @@ from calcutron.ui_qt.theme import Palette
 CELL = 14
 GAP = 2
 NIBBLE_GAP = 6
-BITS_PER_ROW = 32
 INDEX_H = 12  # strip below each cell row for bit-index labels
 ROW_H = CELL + GAP + INDEX_H
+BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
 
 
 class BitGrid(QWidget):
-    """Clickable bit cells, MSB left, one or two rows of 32."""
+    """Clickable bit cells, MSB top-left.
+
+    The grid fills the available width and wraps at byte boundaries, so every
+    bit stays visible at any window width and word size (no clipping from
+    stale size hints).
+    """
 
     bit_toggled = Signal(int)  # bit index
 
@@ -43,34 +48,47 @@ class BitGrid(QWidget):
         self.word_size = 64
         self.value = 0
         self.enabled_look = True
-        self.setMinimumHeight(2 * ROW_H + 8)
+        self._apply_height()
 
     def set_state(self, value: int, word_size: int, enabled: bool) -> None:
         self.value = value
         self.word_size = word_size
         self.enabled_look = enabled
-        rows = (word_size + BITS_PER_ROW - 1) // BITS_PER_ROW
-        self.setMinimumHeight(rows * ROW_H + 8)
+        self._apply_height()
         self.update()
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
         self.update()
 
+    def _bits_per_row(self) -> int:
+        usable = max(self.width() - 8, BYTE_WIDTH)
+        bytes_fit = max(1, (usable + NIBBLE_GAP) // BYTE_WIDTH)
+        return min(self.word_size, 8 * bytes_fit)
+
+    def _rows(self) -> int:
+        per_row = self._bits_per_row()
+        return (self.word_size + per_row - 1) // per_row
+
+    def _apply_height(self) -> None:
+        self.setMinimumHeight(self._rows() * ROW_H + 8)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self._apply_height()
+        super().resizeEvent(event)
+
     def _cell_rect(self, bit: int) -> QRectF:
         """Rect for a bit index (0 = LSB). MSB is top-left."""
+        per_row = self._bits_per_row()
         pos = self.word_size - 1 - bit  # 0 for MSB
-        row, col = divmod(pos, BITS_PER_ROW)
+        row, col = divmod(pos, per_row)
         nibble_gaps = col // 4
         x = 4 + col * (CELL + GAP) + nibble_gaps * NIBBLE_GAP
         y = 4 + row * ROW_H
         return QRectF(x, y, CELL, CELL)
 
     def sizeHint(self) -> QSize:
-        cols = min(self.word_size, BITS_PER_ROW)
-        rows = (self.word_size + BITS_PER_ROW - 1) // BITS_PER_ROW
-        width = 8 + cols * (CELL + GAP) + (cols // 4) * NIBBLE_GAP
-        return QSize(width, rows * ROW_H + 8)
+        return QSize(2 * BYTE_WIDTH, self._rows() * ROW_H + 8)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -166,22 +184,28 @@ class IntegerView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
         layout.addLayout(grid)
-        layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.grid_widget)
         layout.addLayout(actions)
 
     # -- state ---------------------------------------------------------------
 
     def show_value(self, value: int | None, word_size: int, signed: bool) -> None:
+        # scratch is kept unmasked: cycling the word size must only change how
+        # the value is *displayed*, never destroy its upper bits.
         self.word_size = word_size
         self.signed = signed
         self.active = value is not None
         if value is not None:
-            self.scratch = value & ((1 << word_size) - 1)
+            self.scratch = value
         self._refresh()
 
     def toggle_bit(self, bit: int) -> None:
         self.scratch ^= 1 << bit
         self._refresh()
+
+    @property
+    def _masked_scratch(self) -> int:
+        return self.scratch & ((1 << self.word_size) - 1)
 
     def _refresh(self) -> None:
         views = integer_views(self.scratch, self.word_size)
@@ -193,11 +217,12 @@ class IntegerView(QWidget):
         }
         for base, (name, value_label) in self.rows.items():
             value_label.setText(texts[base] if self.active else "—")
+            value_label.setToolTip(texts[base] if self.active else "")  # full text when clipped
             for w in (name, value_label):
                 w.setProperty("dimmed", "false" if self.active else "true")
                 w.style().unpolish(w)
                 w.style().polish(w)
-        self.grid_widget.set_state(self.scratch, self.word_size, self.active)
+        self.grid_widget.set_state(self._masked_scratch, self.word_size, self.active)
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
@@ -216,7 +241,7 @@ class IntegerView(QWidget):
         if not self.active:
             return
         width = self.word_size
-        hex_digits = f"{self.scratch:0{width // 4}X}"
+        hex_digits = f"{self._masked_scratch:0{width // 4}X}"
         if flavor == "verilog":
             text = f"{width}'h{hex_digits}"
         elif flavor == "vhdl":
@@ -228,4 +253,4 @@ class IntegerView(QWidget):
 
     def _emit_to_input(self) -> None:
         if self.active:
-            self.value_to_input.emit(f"0x{self.scratch:X}")
+            self.value_to_input.emit(f"0x{self._masked_scratch:X}")
