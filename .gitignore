@@ -9,3 +9,6 @@ build/
 .hypothesis/
 .mypy_cache/
 .ruff_cache/
+
+# Local Claude Code settings
+.claude/settings.local.json*

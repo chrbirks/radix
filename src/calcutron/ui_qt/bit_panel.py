@@ -142,6 +142,7 @@ class IntegerView(QWidget):
         self.active = False
 
         self.rows: dict[str, tuple[QLabel, QLabel]] = {}
+        self._copy_texts: dict[str, str] = {}
         grid = QGridLayout()
         grid.setContentsMargins(12, 8, 12, 4)
         grid.setHorizontalSpacing(10)
@@ -215,8 +216,18 @@ class IntegerView(QWidget):
             "SGN": views.dec_signed,
             "BIN": views.binary,
         }
+        self._copy_texts = texts
         for base, (name, value_label) in self.rows.items():
-            value_label.setText(texts[base] if self.active else "—")
+            if not self.active:
+                value_label.setText("—")
+            elif base == "BIN":
+                # Set bits in the bit-grid blue so 1s stand out from 0s.
+                highlighted = texts[base].replace(
+                    "1", f'<span style="color:{self.palette_tokens.bit_on}">1</span>'
+                )
+                value_label.setText(highlighted)
+            else:
+                value_label.setText(texts[base])
             value_label.setToolTip(texts[base] if self.active else "")  # full text when clipped
             for w in (name, value_label):
                 w.setProperty("dimmed", "false" if self.active else "true")
@@ -227,14 +238,14 @@ class IntegerView(QWidget):
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
         self.grid_widget.set_palette(palette)
+        self._refresh()  # re-render the BIN highlight color
 
     # -- actions --------------------------------------------------------------
 
     def copy_base(self, base: str) -> None:
         if not self.active:
             return
-        text = self.rows[base][1].text()
-        self._clipboard(text)
+        self._clipboard(self._copy_texts[base])  # plain text, never the rich-text markup
         self.copied.emit(f"{base} copied")
 
     def copy_hdl(self, flavor: str) -> None:

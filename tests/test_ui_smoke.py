@@ -83,6 +83,17 @@ def test_bit_toggle_updates_scratch(qtbot, window: MainWindow) -> None:  # type:
     assert window.intview.rows["DEC"][1].text() == "9"
 
 
+def test_bin_row_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtWidgets import QApplication
+
+    _submit(qtbot, window, "0b1010")
+    label_text = window.intview.rows["BIN"][1].text()
+    assert '<span style="color:' in label_text  # 1s are colored
+    window.intview.copy_base("BIN")
+    copied = QApplication.clipboard().text()
+    assert "<" not in copied and copied.endswith("1010")
+
+
 def test_copy_result_shortcut(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 
