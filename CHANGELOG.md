@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Errors now underline the offending span directly in the input field (red
+  wavy underline) instead of a `·····^` caret in the preview line, which
+  drifted off-target because the preview and input use different font sizes.
 - Window size was saved on close but never actually restored (the startup
   default overrode it).
 

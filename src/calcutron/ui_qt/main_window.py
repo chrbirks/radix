@@ -241,18 +241,20 @@ class MainWindow(QMainWindow):
     def _update_preview(self) -> None:
         text = self.input.text()
         if not text.strip():
+            self.highlighter.set_error_span(None)
             self._set_preview(" ", error=False)
             self._panel_follow(self.session.ans)  # back to the last result
             return
         try:
             outcome = self.session.preview(text)
         except IncompleteError:
+            self.highlighter.set_error_span(None)
             self._set_preview("…", error=False)
             return  # keep the panel steady while typing continues
         except CalcError as exc:
-            marker = "·" * exc.span.start + "^"
-            self._set_preview(f"{marker}  {exc.message}", error=True)
+            self._show_error(exc)
             return
+        self.highlighter.set_error_span(None)
         if outcome.kind == "help":
             self._set_preview("press Enter for help", error=False)
             return
@@ -286,8 +288,10 @@ class MainWindow(QMainWindow):
         style.polish(self.preview)
 
     def _show_error(self, exc: CalcError) -> None:
-        marker = "·" * exc.span.start + "^" * max(1, exc.span.end - exc.span.start)
-        self._set_preview(f"{marker}  {exc.message}", error=True)
+        # The offending span gets a wavy underline in the input itself (a
+        # text caret under a differently-sized preview font never lines up).
+        self.highlighter.set_error_span((exc.span.start, exc.span.end))
+        self._set_preview(exc.message, error=True)
 
     # -- history recall ---------------------------------------------------------
 

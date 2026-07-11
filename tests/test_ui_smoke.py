@@ -61,11 +61,15 @@ def test_preview_is_side_effect_free(qtbot, window: MainWindow) -> None:  # type
     assert window.session.ans is None
 
 
-def test_preview_error_has_caret(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+def test_preview_error_underlines_span(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     window.input.setText("1 + )")
     window._update_preview()
     assert window.preview.property("state") == "error"
-    assert "^" in window.preview.text()
+    assert window.highlighter.error_span == (4, 5)  # the `)` token
+    window.input.setText("1 + 1")
+    window._update_preview()
+    assert window.preview.property("state") == "ok"
+    assert window.highlighter.error_span is None
 
 
 def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
