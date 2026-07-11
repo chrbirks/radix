@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
   QSettings.
 
+- New visualization panel between the preview and the integer panel, driven
+  by structured payloads the engine attaches to results. `fix()`/`unfix()`
+  now draw the Qm.n layout: sign/integer/fraction bit bands with the binary
+  point marked, the exact vs. stored value, and a quantization-error meter
+  scaled against the ½ LSB round-to-nearest bound.
 - Float results no longer grey the integer panel: at 32/64-bit word size the
   panel shows the IEEE-754 bit pattern with color-coded sign / exponent /
   mantissa bands and decoded HEX / SGN / EXP / MAN rows (read-only; copy

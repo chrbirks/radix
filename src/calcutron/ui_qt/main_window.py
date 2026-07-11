@@ -33,6 +33,7 @@ from calcutron.ui_qt.history_model import HistoryDelegate, HistoryEntry, History
 from calcutron.ui_qt.input_edit import InputEdit
 from calcutron.ui_qt.settings import app_settings, load_session, save_session
 from calcutron.ui_qt.theme import Palette
+from calcutron.ui_qt.viz_panel import VizPanel
 
 PREVIEW_DEBOUNCE_MS = 100
 
@@ -100,10 +101,13 @@ class MainWindow(QMainWindow):
         self.intview.value_to_input.connect(self._set_input)
         self.intview.copied.connect(self._toast)
 
+        self.vizpanel = VizPanel(palette)
+
         layout.addWidget(self.history_view, stretch=1)
         layout.addWidget(self.help_pane, stretch=1)
         layout.addWidget(self.input)
         layout.addWidget(self.preview)
+        layout.addWidget(self.vizpanel)
         layout.addWidget(self.intview)
         self.setCentralWidget(root)
 
@@ -207,6 +211,7 @@ class MainWindow(QMainWindow):
             self.input.clear()
             self._toast("cleared")
             self.intview.show_value(None, self.session.word_size, self.session.signed)
+            self.vizpanel.show_payload(None)
             return
         if outcome.value is None:
             return
@@ -273,6 +278,7 @@ class MainWindow(QMainWindow):
         Integers drive the editable bit grid; reals show the read-only
         IEEE-754 view (word size 32/64) or grey the panel (8/16).
         """
+        self.vizpanel.show_payload(value.viz if value is not None else None)
         number = value.number if value is not None else None
         if isinstance(number, int):
             self.intview.show_value(number, self.session.word_size, self.session.signed)
@@ -448,6 +454,7 @@ class MainWindow(QMainWindow):
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
         self.intview.set_palette(palette)
+        self.vizpanel.set_palette(palette)
         self.highlighter.set_palette(palette)
         self.completer.set_palette(palette)
         self.history_view.viewport().update()

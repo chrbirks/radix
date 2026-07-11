@@ -15,9 +15,12 @@ display metadata only — it never changes arithmetic.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import mpmath
+
+if TYPE_CHECKING:
+    from calcutron.engine.viz import VizPayload
 
 # Working precision (decimal digits) for real-number math. Display precision is
 # independent and much lower; see formatter.py.
@@ -36,6 +39,7 @@ class Value:
     declared_width: int | None = None  # from HDL sized literals, e.g. 8 for 8'hFF
     prefer_si: bool = False  # period()/freq(): render with an SI suffix (10n, 125M)
     note: str | None = None  # e.g. fix(): quantization error, shown next to the result
+    viz: VizPayload | None = None  # structured payload for the UI's VizPanel
 
     @property
     def is_integer(self) -> bool:

@@ -137,6 +137,10 @@ def stylesheet(p: Palette, mono: str) -> str:
         background: {p.background};
         border-top: 1px solid {p.hairline};
     }}
+    QWidget#vizPanel {{
+        background: {p.surface};
+        border-top: 1px solid {p.hairline};
+    }}
     QLabel.baseName {{
         color: {p.muted};
         font-size: 16px;

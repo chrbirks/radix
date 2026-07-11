@@ -93,6 +93,21 @@ def test_preview_error_underlines_span(qtbot, window: MainWindow) -> None:  # ty
     assert window.highlighter.error_span is None
 
 
+def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from calcutron.engine.viz import FixedPointViz
+
+    _submit(qtbot, window, "fix(0.7071, 1, 15)")
+    assert window.vizpanel.isVisibleTo(window)
+    assert isinstance(window.vizpanel.payload, FixedPointViz)
+    assert window.vizpanel.payload.raw == 0x5A82
+    _submit(qtbot, window, "1 + 1")
+    assert not window.vizpanel.isVisibleTo(window)
+    # The live preview drives it too.
+    window.input.setText("unfix(0x4000, 1, 15)")
+    window._update_preview()
+    assert window.vizpanel.isVisibleTo(window)
+
+
 def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "help")
     assert window.help_pane.isVisibleTo(window)

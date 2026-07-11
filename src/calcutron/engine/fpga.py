@@ -17,6 +17,7 @@ from calcutron.engine.functions import (
     _register,
 )
 from calcutron.engine.values import Number, Value
+from calcutron.engine.viz import FixedPointViz
 
 MAX_MASK_BITS = 1_000_000
 
@@ -169,17 +170,36 @@ def _fix(args: list[Number], ctx: EvalContext) -> Value:
     quantized = mpmath.mpf(scaled) / (1 << n)
     err = x - quantized
     note = f"Q{m}.{n}, quantization error = {mpmath.nstr(err, 3)}"
-    return Value(raw, declared_width=total, note=note)
+    viz = FixedPointViz(
+        m=m,
+        n=n,
+        raw=raw,
+        exact_text=mpmath.nstr(x, 8),
+        stored_text=mpmath.nstr(quantized, 8),
+        error_text=mpmath.nstr(err, 3),
+        error_lsb=float(abs(err) * (1 << n)),
+    )
+    return Value(raw, declared_width=total, note=note, viz=viz)
 
 
 def _unfix(args: list[Number], ctx: EvalContext) -> Value:
     """Qm.n two's-complement raw value → real."""
     raw = _int_arg(args, 0, "unfix")
     m, n, total = _q_format(args, "unfix")
-    raw &= (1 << total) - 1
-    if raw >> (total - 1):
-        raw -= 1 << total
-    return Value(mpmath.mpf(raw) / (1 << n), note=f"from Q{m}.{n}")
+    wrapped = raw & ((1 << total) - 1)
+    signed = wrapped - (1 << total) if wrapped >> (total - 1) else wrapped
+    real = mpmath.mpf(signed) / (1 << n)
+    text = mpmath.nstr(real, 8)
+    viz = FixedPointViz(
+        m=m,
+        n=n,
+        raw=wrapped,
+        exact_text=text,
+        stored_text=text,  # decoding is exact: no quantization step
+        error_text="0",
+        error_lsb=0.0,
+    )
+    return Value(real, note=f"from Q{m}.{n}", viz=viz)
 
 
 _BITS = "Bit utilities"

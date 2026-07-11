@@ -100,6 +100,26 @@ def test_fix_unfix_roundtrip() -> None:
     assert run("unfix(0xC000, 1, 15)") == "-0.5"
 
 
+def test_fix_attaches_viz_payload() -> None:
+    from calcutron.engine.viz import FixedPointViz
+
+    session = Session()
+    outcome = session.evaluate("fix(0.5, 1, 15)")
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, FixedPointViz)
+    assert (viz.m, viz.n, viz.raw) == (1, 15, 0x4000)
+    assert viz.error_lsb == 0.0  # 0.5 is exactly representable
+    assert viz.stored_text == "0.5"
+
+    outcome = session.evaluate("unfix(0x5A82, 1, 15)")
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, FixedPointViz)
+    assert viz.raw == 0x5A82
+    assert viz.error_lsb == 0.0 and viz.error_text == "0"
+
+
 def test_fix_range_errors() -> None:
     with pytest.raises(EvalError, match="does not fit"):
         run("fix(1.5, 1, 15)")  # Q1.15 max is ~0.99997
