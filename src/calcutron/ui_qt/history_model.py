@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from typing import Any
 
 from PySide6.QtCore import (
@@ -29,6 +30,13 @@ class HistoryEntry:
     expression: str
     result: str  # formatted primary text (or "x ← 12" for assignments)
     note: str = ""
+    # Integer entries re-render when the display base changes; dec_text is the
+    # decimal form recorded at commit time (may be SI-suffixed, so it is kept
+    # verbatim rather than regenerated). Entries loaded from disk have
+    # number=None and simply keep their text.
+    number: int | None = None
+    prefix: str = ""  # "x ← " for assignments, else ""
+    dec_text: str = ""
 
 
 class HistoryModel(QAbstractListModel):
@@ -60,6 +68,20 @@ class HistoryModel(QAbstractListModel):
         self.beginResetModel()
         self.entries.clear()
         self.endResetModel()
+
+    def reformat(self, primary: Callable[[int, HistoryEntry], str]) -> None:
+        """Rewrite integer results after a display-base (or word-size) change."""
+        changed = False
+        for i, entry in enumerate(self.entries):
+            if entry.number is None:
+                continue
+            result = entry.prefix + primary(entry.number, entry)
+            if result != entry.result:
+                self.entries[i] = replace(entry, result=result)
+                changed = True
+        if changed:
+            first, last = self.index(0), self.index(len(self.entries) - 1)
+            self.dataChanged.emit(first, last)
 
 
 def _scaled(base: QFont, factor: float) -> QFont:

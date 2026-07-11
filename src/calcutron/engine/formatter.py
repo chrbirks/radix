@@ -68,6 +68,23 @@ def format_real(x: mpmath.mpf, notation: Notation = "auto") -> str:
     raise ValueError(f"unknown notation {notation!r}")
 
 
+def format_int_base(value: int, base: str, word_size: int) -> str:
+    """Compact hex/bin rendering of an integer result (display base option).
+
+    Non-negative values render at their natural width, nibble-grouped;
+    negative values render as word-size two's complement, matching the
+    integer panel.
+    """
+    if base == "dec":
+        return str(value)
+    wrapped = value & ((1 << word_size) - 1) if value < 0 else value
+    if base == "hex":
+        return _group(f"{wrapped:X}", 4, min_width=1, prefix="0x")
+    if base == "bin":
+        return _group(f"{wrapped:b}", 4, min_width=1, prefix="0b")
+    raise ValueError(f"unknown base {base!r}")
+
+
 def integer_views(value: int, word_size: int) -> IntegerViews:
     mask = (1 << word_size) - 1
     wrapped = value & mask

@@ -127,6 +127,30 @@ def test_word_size_cycling_is_display_only(qtbot, window: MainWindow) -> None:  
     assert window.intview.rows["HEX"][1].text() == "0xFFFF"
 
 
+def test_result_base_applies_to_history_and_preview(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "1020")
+    _submit(qtbot, window, "q = 255")
+    _submit(qtbot, window, "sin(1)")
+    float_text = window.model.entries[-1].result
+
+    window._cycle_int_base()  # dec -> hex
+    assert window.status_items["base"].text() == "HEX"
+    assert window.model.entries[-3].result == "0x3FC"
+    assert window.model.entries[-2].result == "q ← 0xFF"
+    assert window.model.entries[-1].result == float_text  # floats untouched
+
+    window.input.setText("128 + 2")
+    window._update_preview()
+    assert window.preview.text().endswith("= 0x82")
+
+    window._cycle_int_base()  # hex -> bin
+    assert window.model.entries[-3].result == "0b11_1111_1100"
+    window._cycle_int_base()  # bin -> dec restores the recorded text
+    assert window.status_items["base"].text() == "DEC"
+    assert window.model.entries[-3].result == "1020"
+    assert window.model.entries[-2].result == "q ← 255"
+
+
 def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     window.input.setText("0xAB << 4")
     window._update_preview()

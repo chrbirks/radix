@@ -39,7 +39,7 @@ SHORTCUT_HELP = """Keyboard shortcuts
   F1 or help   this help         Esc          dismiss help
   Alt+W        cycle word size   Alt+S        toggle signed/unsigned
   Alt+D        toggle deg/rad    Alt+N        cycle notation
-  Alt+T        always on top"""
+  Alt+B        result base       Alt+T        always on top"""
 
 
 class MainWindow(QMainWindow):
@@ -136,6 +136,7 @@ class MainWindow(QMainWindow):
             ("angle", self._toggle_angle),
             ("word", self._cycle_word_size),
             ("sign", self._toggle_signed),
+            ("base", self._cycle_int_base),
             ("notation", self._cycle_notation),
         ):
             label = _ClickableLabel(handler)
@@ -160,6 +161,7 @@ class MainWindow(QMainWindow):
             ("Alt+S", self._toggle_signed),
             ("Alt+D", self._toggle_angle),
             ("Alt+N", self._cycle_notation),
+            ("Alt+B", self._cycle_int_base),
             ("Alt+T", self._toggle_always_on_top),
         ):
             action = QAction(self)
@@ -194,9 +196,20 @@ class MainWindow(QMainWindow):
         if outcome.value is None:
             return
         primary = self.session.format_value(outcome.value)
-        display = f"{outcome.target} ← {primary}" if outcome.kind == "assign" else primary
+        prefix = f"{outcome.target} ← " if outcome.kind == "assign" else ""
+        display = prefix + primary
         self.last_result_text = primary
-        self.model.append(HistoryEntry(text.strip(), display, outcome.value.note or ""))
+        number = outcome.value.number
+        self.model.append(
+            HistoryEntry(
+                text.strip(),
+                display,
+                outcome.value.note or "",
+                number=number if isinstance(number, int) else None,
+                prefix=prefix,
+                dec_text=self.session.format_value(outcome.value, base="dec"),
+            )
+        )
         if self.store is not None:
             self.store.append(text.strip(), display, outcome.value.note or "")
         self.history_view.scrollToBottom()
@@ -324,8 +337,13 @@ class MainWindow(QMainWindow):
         self.session.cycle_notation()
         self._after_setting_change()
 
+    def _cycle_int_base(self) -> None:
+        self.session.cycle_int_base()
+        self._after_setting_change()
+
     def _after_setting_change(self) -> None:
         self._refresh_status()
+        self._reformat_history()
         # Re-render the current panel value under the new settings; never re-evaluate.
         self.intview.show_value(
             self.intview.scratch if self.intview.active else None,
@@ -334,18 +352,27 @@ class MainWindow(QMainWindow):
         )
         self._update_preview()
 
+    def _reformat_history(self) -> None:
+        """Re-render integer history results in the current display base."""
+        if self.session.int_base == "dec":
+            self.model.reformat(lambda _number, entry: entry.dec_text)
+        else:
+            self.model.reformat(lambda number, _entry: self.session.format_int(number))
+
     def _refresh_status(self) -> None:
         session = self.session
         texts = {
             "angle": "DEG" if session.angle_deg else "RAD",
             "word": f"{session.word_size}-bit",
             "sign": "signed" if session.signed else "unsigned",
+            "base": session.int_base.upper(),
             "notation": session.notation.replace("eng_si", "eng·si").upper(),
         }
         tips = {
             "angle": "angle unit — click or Alt+D",
             "word": "word size for bit ops — click or Alt+W",
             "sign": "signedness of >> and SGN row — click or Alt+S",
+            "base": "integer result base for history & preview — click or Alt+B",
             "notation": "float notation — click or Alt+N",
         }
         for key, label in self.status_items.items():

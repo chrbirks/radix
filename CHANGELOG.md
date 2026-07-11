@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Integer result display base (dec/hex/bin) for the history pane and the
+  live preview — cycle via the status-bar item or Alt+B. Existing history
+  entries re-render in the chosen base; float results are unaffected.
+
 ### Changed
 
 - Larger bit-grid cells (24 px) for readability.

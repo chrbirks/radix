@@ -14,7 +14,12 @@ from calcutron.engine import evaluator, render
 from calcutron.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
 from calcutron.engine import help as help_mod
 from calcutron.engine.errors import CalcError, EvalError
-from calcutron.engine.formatter import IntegerViews, format_number, integer_views
+from calcutron.engine.formatter import (
+    IntegerViews,
+    format_int_base,
+    format_number,
+    integer_views,
+)
 from calcutron.engine.functions import CONSTANTS, FUNCTIONS, EvalContext
 from calcutron.engine.nodes import Assign
 from calcutron.engine.parser import parse
@@ -22,6 +27,7 @@ from calcutron.engine.values import Value
 
 WORD_SIZES = (8, 16, 32, 64)
 NOTATIONS = ("auto", "sci", "eng", "eng_si")
+INT_BASES = ("dec", "hex", "bin")
 
 RESERVED_NAMES = frozenset({"ans", "help", "clear"}) | frozenset(CONSTANTS) | frozenset(FUNCTIONS)
 
@@ -49,6 +55,7 @@ class Session:
     signed: bool = False
     angle_deg: bool = False
     notation: str = "auto"
+    int_base: str = "dec"  # display base for integer results (dec/hex/bin)
     variables: dict[str, Value] = field(default_factory=dict)
     ans: Value | None = None
 
@@ -67,6 +74,11 @@ class Session:
         i = NOTATIONS.index(self.notation)
         self.notation = NOTATIONS[(i + 1) % len(NOTATIONS)]
         return self.notation
+
+    def cycle_int_base(self) -> str:
+        i = INT_BASES.index(self.int_base)
+        self.int_base = INT_BASES[(i + 1) % len(INT_BASES)]
+        return self.int_base
 
     # -- evaluation ------------------------------------------------------------
 
@@ -119,8 +131,16 @@ class Session:
 
     # -- display helpers -------------------------------------------------------
 
-    def format_value(self, value: Value) -> str:
+    def format_value(self, value: Value, base: str | None = None) -> str:
+        """Primary display text; integer results honor the display base."""
+        base = self.int_base if base is None else base
+        if base != "dec" and isinstance(value.number, int):
+            return format_int_base(value.number, base, self.word_size)
         return format_number(value, self.notation)
+
+    def format_int(self, number: int) -> str:
+        """An already-known integer in the current display base."""
+        return format_int_base(number, self.int_base, self.word_size)
 
     def views_for(self, value: Value) -> IntegerViews | None:
         """Hex/dec/bin renderings if the value is an integer, else None."""
@@ -136,4 +156,4 @@ class Session:
         return self.evaluate(text, commit=False)
 
 
-__all__ = ["Session", "Outcome", "CalcError", "WORD_SIZES", "NOTATIONS"]
+__all__ = ["Session", "Outcome", "CalcError", "WORD_SIZES", "NOTATIONS", "INT_BASES"]

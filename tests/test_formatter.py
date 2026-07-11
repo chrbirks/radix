@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import mpmath
 
-from calcutron.engine.formatter import format_real, integer_views
+from calcutron.engine.formatter import format_int_base, format_real, integer_views
 from calcutron.session import Session
 
 
@@ -56,3 +56,31 @@ def test_preview_rendering() -> None:
     assert session.preview("x << 2").normalized == "255 << 2"
     assert session.preview("y = 3*4").normalized == "y ← 3 × 4"
     assert session.preview("1/2pi").normalized == "1 / 2 × pi"
+
+
+def test_format_int_base_compact() -> None:
+    assert format_int_base(1020, "dec", 64) == "1020"
+    assert format_int_base(1020, "hex", 64) == "0x3FC"
+    assert format_int_base(1020, "bin", 64) == "0b11_1111_1100"
+    assert format_int_base(0, "hex", 64) == "0x0"
+    assert format_int_base(0xDEADBEEF, "hex", 64) == "0xDEAD_BEEF"
+    # Negatives render as word-size two's complement, matching the panel.
+    assert format_int_base(-1, "hex", 8) == "0xFF"
+    assert format_int_base(-1, "bin", 8) == "0b1111_1111"
+    assert format_int_base(-2, "hex", 16) == "0xFFFE"
+
+
+def test_session_format_value_honors_int_base() -> None:
+    session = Session()
+    value = session.evaluate("0xFF << 2").value
+    assert value is not None
+    assert session.format_value(value) == "1020"
+    session.int_base = "hex"
+    assert session.format_value(value) == "0x3FC"
+    assert session.format_value(value, base="dec") == "1020"  # explicit override
+    session.int_base = "bin"
+    assert session.format_value(value) == "0b11_1111_1100"
+    # Floats are untouched by the base setting.
+    fval = session.evaluate("1/8").value
+    assert fval is not None
+    assert session.format_value(fval) == "0.125"
