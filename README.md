@@ -7,12 +7,18 @@ Python and PySide6. Runs on Windows and Linux.
 
 Everything is typed into one input field — no button grids. One unified,
 modeless grammar: `**` is always power, `^` is always XOR, and any integer
-result automatically shows hex, decimal, binary, and a clickable bit panel —
-toggling a bit writes the edited value straight back into the input line.
-A live preview under the input shows the parsed interpretation and the result
-on every keystroke, before you press Enter. Typing a name pops autocomplete
-with signatures and summaries (Tab inserts), and `help` shows every function
-grouped by category — both generated from the evaluator's own tables.
+result automatically shows hex, decimal, binary, ASCII bytes, and a clickable
+bit panel — toggling a bit writes the edited value straight back into the
+input line, dragging across cells selects a bit range and reads out that
+field (`[15:8] = 0xBE = 190`), and bits that changed since the previous value
+are outlined. Float results show their IEEE-754 layout (sign/exponent/
+mantissa bands) instead of going grey. A live preview under the input shows
+the parsed interpretation and the result on every keystroke, before you press
+Enter; errors underline the offending span right in the input. Typing a name
+pops autocomplete with signatures and summaries (Tab inserts), and `help`
+shows every function grouped by category — both generated from the
+evaluator's own tables. Toolkit results with something worth drawing (Qm.n
+layouts, clock dividers, memory sizing) get a small visualization panel.
 
 ## Quick start
 
@@ -45,9 +51,14 @@ version; release history lives in [CHANGELOG.md](CHANGELOG.md).
   9                        revbits byteswap16/32/64 sext zext rol ror
 > period(100M)             clock helpers, SI-formatted output
   10n
+> clkdiv(50M, 115200)      nearest divider with achieved rate + ppm error
+  434  (actual 115.207k, error +64 ppm)
+> mem(4096, 36)            RAM sizing: address bits, capacity, utilization
+  147456  (addr 12 bits, 18 KiB)
 > fix(0.7071, 1, 15)       fixed-point Qm.n with quantization error shown
   23170  (0x5A82)
 > ans / 2                  ans = previous result; variables persist per session
+> vars                     list variables (Alt+V); del x removes one
 > help <<                  help for any operator or function
 ```
 
@@ -79,7 +90,12 @@ immediately — existing history entries re-render in place:
   integers — `10000000` shows as `1e+7` (SCI), `10e+6` (ENG), or `10M`
   (ENG·SI). AUTO keeps integers exact; the hex/bin base wins over notation.
 - **Word size / signedness** (Alt+W / Alt+S): reinterprets the integer panel
-  and bit grid without re-evaluating anything.
+  and bit grid without re-evaluating anything. At 32/64-bit word sizes, float
+  results render as IEEE-754 single/double bit layouts with decoded
+  sign/exponent/mantissa rows.
+
+Right-click a history entry to copy its result or expression, copy the value
+as hex/dec/bin, recall it, or delete it.
 
 All settings — word size, signedness, deg/rad, notation, result base,
 always-on-top, window geometry — persist across restarts in a plain INI file
@@ -98,7 +114,9 @@ always-on-top, window geometry — persist across restarts in a plain INI file
 | Alt+W / Alt+S | word size / signedness |
 | Alt+D / Alt+N | deg-rad / notation |
 | Alt+B | result base (dec/hex/bin) |
+| Alt+V | variables pane (`del <name>` removes) |
 | Alt+T | always on top |
+| Esc | dismiss help/variables pane, clear bit-range selection |
 
 `clear` wipes variables and persistent history. History is stored as JSONL in
 the platform user-data directory and recalled entries re-evaluate through the

@@ -36,6 +36,11 @@ diagnostics.
   commit=False)` is the side-effect-free preview path.
 - `src/calcutron/ui_qt/` — the UI only calls `Session.evaluate` and renders
   the result; it never computes math itself.
+- Rich result graphics ride the `Value.viz` channel: engine functions attach
+  a frozen payload from `engine/viz.py` (`FixedPointViz`/`ClockViz`/`MemViz` —
+  numbers *and* pre-formatted text computed engine-side), and
+  `ui_qt/viz_panel.py` only paints it. A new visualization = a new payload
+  dataclass + a `_paint_*` branch; never derive math in the panel.
 - `tests/` — golden tables are the executable spec; Hypothesis property
   tests; pytest-qt smoke tests.
 
