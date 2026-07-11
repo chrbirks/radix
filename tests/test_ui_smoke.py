@@ -83,6 +83,16 @@ def test_bit_toggle_updates_scratch(qtbot, window: MainWindow) -> None:  # type:
     assert window.intview.rows["DEC"][1].text() == "9"
 
 
+def test_bit_toggle_writes_input(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "8")
+    window.intview.toggle_bit(0)
+    assert window.input.text() == "0x9"
+    window.intview.toggle_bit(4)
+    assert window.input.text() == "0x19"
+    window._update_preview()  # the input round-trip must not disturb the scratch
+    assert window.intview.scratch == 0x19
+
+
 def test_bin_row_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 

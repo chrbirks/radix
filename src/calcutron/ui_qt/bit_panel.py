@@ -1,9 +1,10 @@
 """Integer view: hex/dec/bin rows with per-base copy, plus clickable bit rows.
 
 The panel shows a *scratch* value seeded from the latest integer result.
-Clicking a bit cell toggles that bit of the scratch value and re-renders all
-bases; the "→ input" button places the scratch value into the input line as a
-hex literal. A new result reseeds the scratch. Float results grey the panel.
+Clicking a bit cell toggles that bit of the scratch value, re-renders all
+bases, and writes the new value into the input line as a hex literal (the
+"→ input" button does the same on demand). A new result reseeds the scratch.
+Float results grey the panel.
 """
 
 from __future__ import annotations
@@ -203,6 +204,7 @@ class IntegerView(QWidget):
     def toggle_bit(self, bit: int) -> None:
         self.scratch ^= 1 << bit
         self._refresh()
+        self._emit_to_input()  # the input line always reflects the edited value
 
     @property
     def _masked_scratch(self) -> int:
