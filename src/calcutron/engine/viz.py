@@ -1,7 +1,8 @@
 """Structured visualization payloads attached to Values.
 
-Toolkit functions that have something worth *drawing* (fixed-point layouts,
-clock relations, memory sizing) attach one of these to their result Value.
+Toolkit functions that have something worth *drawing* (fixed-point and
+IEEE-754 layouts, clock relations, memory sizing) attach one of these to
+their result Value.
 The engine computes every number in the payload; the UI's VizPanel only
 renders them and never re-derives math. Text fields are pre-formatted here
 for the same reason.
@@ -58,4 +59,21 @@ class MemViz:
     util_text: str  # pre-formatted, e.g. "73%"
 
 
-VizPayload: TypeAlias = FixedPointViz | ClockViz | MemViz
+@dataclass(frozen=True)
+class FloatBitsViz:
+    """IEEE-754 field layout for float32()/float64()/unfloat32()/unfloat64()."""
+
+    width: int  # 32 or 64
+    exp_width: int  # 8 or 11
+    man_width: int  # 23 or 52
+    bits: int  # the packed bit pattern
+    hex_text: str  # nibble-grouped, e.g. "0x3FC0_0000"
+    exact_text: str  # the requested value
+    stored_text: str  # the value actually stored after rounding to the format
+    rounded: bool  # True when storing changed the value (numeric compare)
+    sign_text: str  # "+" / "-"
+    exponent_text: str  # decoded, e.g. "127 - bias 127 = 2^0"
+    mantissa_text: str  # decoded, e.g. "1.5"
+
+
+VizPayload: TypeAlias = FixedPointViz | ClockViz | MemViz | FloatBitsViz

@@ -132,6 +132,20 @@ def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[
     assert payload.addressable == 4096
 
 
+def test_viz_panel_float_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from calcutron.engine.viz import FloatBitsViz
+    from calcutron.ui_qt.viz_panel import BAR_H, LINE_H
+
+    _submit(qtbot, window, "float32(1.5)")
+    assert window.vizpanel.isVisibleTo(window)
+    payload = window.vizpanel.payload
+    assert isinstance(payload, FloatBitsViz)
+    assert payload.bits == 0x3FC00000
+    assert window.vizpanel.height() == 8 + LINE_H + BAR_H + LINE_H + 10
+    assert window.intview.active  # the integer result drives the bit grid
+    assert window.intview.rows["HEX"][1].text().endswith("3FC0_0000")
+
+
 def test_history_context_actions(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 

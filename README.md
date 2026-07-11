@@ -57,6 +57,8 @@ version; release history lives in [CHANGELOG.md](CHANGELOG.md).
   147456  (addr 12 bits, 18 KiB)
 > fix(0.7071, 1, 15)       fixed-point Qm.n with quantization error shown
   23170  (0x5A82)
+> float32(1.5)             IEEE-754 bit pattern as an integer; unfloat32/64 decodes
+  1069547520  (float32 stores 1.5)
 > ans / 2                  ans = previous result; variables persist per session
 > vars                     list variables (Alt+V); del x removes one
 > help <<                  help for any operator or function
@@ -92,7 +94,10 @@ immediately — existing history entries re-render in place:
 - **Word size / signedness** (Alt+W / Alt+S): reinterprets the integer panel
   and bit grid without re-evaluating anything. At 32/64-bit word sizes, float
   results render as IEEE-754 single/double bit layouts with decoded
-  sign/exponent/mantissa rows.
+  sign/exponent/mantissa rows. The same dissection is available at any word
+  size via `float32(x)`/`float64(x)` — the bit pattern as a plain integer,
+  with a color-banded field card — and `unfloat32()`/`unfloat64()` decode a
+  pattern back to the real value.
 
 Right-click a history entry to copy its result or expression, copy the value
 as hex/dec/bin, recall it, or delete it.

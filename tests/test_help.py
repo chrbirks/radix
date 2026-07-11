@@ -16,6 +16,7 @@ def test_general_help_is_categorized_with_signatures() -> None:
         "Bit utilities",
         "Clock & units",
         "Fixed-point",
+        "Floating point",
     ):
         assert category in text
     clog2_line = next(

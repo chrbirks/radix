@@ -8,9 +8,12 @@ preference, quantization-error note).
 
 from __future__ import annotations
 
+import math
+import struct
+
 import mpmath
 
-from calcutron.engine.formatter import format_si
+from calcutron.engine.formatter import float_views, format_si
 from calcutron.engine.functions import (
     EvalContext,
     FunctionDomainError,
@@ -18,7 +21,7 @@ from calcutron.engine.functions import (
     _register,
 )
 from calcutron.engine.values import Number, Value
-from calcutron.engine.viz import ClockViz, FixedPointViz, MemViz
+from calcutron.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz
 
 MAX_MASK_BITS = 1_000_000
 
@@ -267,10 +270,79 @@ def _unfix(args: list[Number], ctx: EvalContext) -> Value:
     return Value(real, note=f"from Q{m}.{n}", viz=viz)
 
 
+# -- IEEE-754 ----------------------------------------------------------------------
+
+
+def _float_pack(width: int) -> Handler:
+    fmt = ">f" if width == 32 else ">d"
+
+    def handler(args: list[Number], ctx: EvalContext) -> Value:
+        name = f"float{width}"
+        x = mpmath.mpf(args[0])
+        try:
+            fv = float_views(x, width)
+        except OverflowError:
+            raise FunctionDomainError(f"{name}: value does not fit the format") from None
+        assert fv is not None  # width is always 32 or 64
+        stored = struct.unpack(fmt, fv.bits.to_bytes(width // 8, "big"))[0]
+        if math.isinf(stored):  # finite input packed to inf: out of range
+            raise FunctionDomainError(f"{name}: value does not fit the format")
+        stored_text = mpmath.nstr(mpmath.mpf(stored), 9)
+        viz = FloatBitsViz(
+            width=width,
+            exp_width=fv.exp_width,
+            man_width=fv.man_width,
+            bits=fv.bits,
+            hex_text=fv.hex,
+            exact_text=mpmath.nstr(x, 9),
+            stored_text=stored_text,
+            rounded=mpmath.mpf(stored) != x,
+            sign_text=fv.sign_text,
+            exponent_text=fv.exponent_text,
+            mantissa_text=fv.mantissa_text,
+        )
+        return Value(fv.bits, declared_width=width,
+                     note=f"{name} stores {stored_text}", viz=viz)
+
+    return handler
+
+
+def _float_unpack(width: int) -> Handler:
+    fmt = ">f" if width == 32 else ">d"
+
+    def handler(args: list[Number], ctx: EvalContext) -> Value:
+        name = f"unfloat{width}"
+        v = _int_arg(args, 0, name) & ((1 << width) - 1)
+        decoded = struct.unpack(fmt, v.to_bytes(width // 8, "big"))[0]
+        if math.isinf(decoded) or math.isnan(decoded):
+            raise FunctionDomainError(f"{name}: pattern decodes to inf/nan")
+        real = mpmath.mpf(decoded)
+        fv = float_views(real, width)
+        assert fv is not None  # width is always 32 or 64
+        text = mpmath.nstr(real, 9)
+        viz = FloatBitsViz(
+            width=width,
+            exp_width=fv.exp_width,
+            man_width=fv.man_width,
+            bits=fv.bits,
+            hex_text=fv.hex,
+            exact_text=text,
+            stored_text=text,  # decoding is exact: nothing is rounded
+            rounded=False,
+            sign_text=fv.sign_text,
+            exponent_text=fv.exponent_text,
+            mantissa_text=fv.mantissa_text,
+        )
+        return Value(real, note=f"from float{width} 0x{v:X}", viz=viz)
+
+    return handler
+
+
 _BITS = "Bit utilities"
 _CLOCK = "Clock & units"
 _MEM = "Memory"
 _FIXED = "Fixed-point"
+_FLOAT = "Floating point"
 
 _TOOLKIT: list[tuple[str, tuple[int, int], str, str, str, str, Handler]] = [
     ("clog2", (1, 1), "n", _BITS,
@@ -314,6 +386,18 @@ _TOOLKIT: list[tuple[str, tuple[int, int], str, str, str, str, Handler]] = [
      "fix(0.7071, 1, 15) = 0x5A82", _fix),
     ("unfix", (3, 3), "raw, m, n", _FIXED,
      "Fixed-point Qm.n raw value -> real.", "unfix(0x5A82, 1, 15)", _unfix),
+    ("float32", (1, 1), "x", _FLOAT,
+     "IEEE-754 single: the 32-bit pattern of x, as an integer.",
+     "float32(1.5) = 0x3FC0_0000", _float_pack(32)),
+    ("float64", (1, 1), "x", _FLOAT,
+     "IEEE-754 double: the 64-bit pattern of x, as an integer.",
+     "float64(1.5)", _float_pack(64)),
+    ("unfloat32", (1, 1), "bits", _FLOAT,
+     "Decode a 32-bit IEEE-754 pattern back to the real value.",
+     "unfloat32(0x3FC00000) = 1.5", _float_unpack(32)),
+    ("unfloat64", (1, 1), "bits", _FLOAT,
+     "Decode a 64-bit IEEE-754 pattern back to the real value.",
+     "unfloat64(0x3FF8000000000000)", _float_unpack(64)),
 ]
 
 

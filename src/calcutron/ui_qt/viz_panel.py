@@ -12,7 +12,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent
 from PySide6.QtWidgets import QWidget
 
-from calcutron.engine.viz import ClockViz, FixedPointViz, MemViz, VizPayload
+from calcutron.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz, VizPayload
 from calcutron.ui_qt.theme import Palette
 
 VIZ_CELL = 18
@@ -43,7 +43,7 @@ class VizPanel(QWidget):
 
     def show_payload(self, payload: VizPayload | None) -> None:
         self.payload = payload
-        if isinstance(payload, FixedPointViz):
+        if isinstance(payload, (FixedPointViz, FloatBitsViz)):
             self.setFixedHeight(8 + LINE_H + BAR_H + LINE_H + 10)
         elif isinstance(payload, ClockViz):
             lines = 2 if payload.divisor is not None else 1
@@ -65,6 +65,8 @@ class VizPanel(QWidget):
             self._paint_clock(painter, self.payload)
         elif isinstance(self.payload, MemViz):
             self._paint_mem(painter, self.payload)
+        elif isinstance(self.payload, FloatBitsViz):
+            self._paint_floatbits(painter, self.payload)
         painter.end()
 
     # -- memory sizing ------------------------------------------------------------
@@ -196,3 +198,47 @@ class VizPanel(QWidget):
             if frac > 0:
                 painter.setBrush(QColor(p.bit_changed if frac > 0.5 else p.accent))
                 painter.drawRoundedRect(QRectF(meter_x, meter_y, METER_W * frac, METER_H), 3, 3)
+
+    # -- IEEE-754 float32/float64 -------------------------------------------------
+
+    def _paint_floatbits(self, painter: QPainter, viz: FloatBitsViz) -> None:
+        p = self.palette_tokens
+        font = painter.font()
+        font.setPixelSize(15)
+        painter.setFont(font)
+
+        # Title: format + stored value + raw pattern (+ the pre-rounding value).
+        painter.setPen(QColor(p.text))
+        title = f"float{viz.width}   {viz.stored_text}   raw {viz.hex_text}"
+        if viz.rounded and viz.exact_text != viz.stored_text:
+            title += f"   (from {viz.exact_text})"
+        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+                         Qt.AlignmentFlag.AlignVCenter, title)
+
+        # Bit-cell bar: sign | exponent | mantissa bands, a field gap between each.
+        cell = VIZ_CELL
+        need = viz.width * (cell + VIZ_GAP) + 2 * POINT_GAP + 2 * MARGIN
+        if need > self.width():  # shrink so 64 cells fit the minimum window
+            cell = max(4, (self.width() - 2 * MARGIN - 2 * POINT_GAP) // viz.width - VIZ_GAP)
+        y = 8 + LINE_H
+        painter.setPen(Qt.PenStyle.NoPen)
+        for i in range(viz.width):
+            bit = viz.width - 1 - i  # MSB first
+            if bit == viz.width - 1:
+                base, shift = p.float_sign, 0  # sign cell
+            elif bit >= viz.man_width:
+                base, shift = p.float_exp, POINT_GAP  # exponent band
+            else:
+                base, shift = p.float_man, 2 * POINT_GAP  # mantissa band
+            x = MARGIN + i * (cell + VIZ_GAP) + shift
+            color = QColor(base)
+            if not (viz.bits >> bit) & 1:
+                color.setAlphaF(0.22)
+            painter.setBrush(color)
+            painter.drawRoundedRect(QRectF(x, y, cell, VIZ_CELL), 2, 2)
+
+        # Decoded fields.
+        painter.setPen(QColor(p.text))
+        line = f"sign {viz.sign_text}   exp {viz.exponent_text}   man {viz.mantissa_text}"
+        painter.drawText(QRectF(MARGIN, y + BAR_H, self.width() - 2 * MARGIN, LINE_H),
+                         Qt.AlignmentFlag.AlignVCenter, line)

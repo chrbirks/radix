@@ -187,6 +187,66 @@ def test_fix_range_errors() -> None:
         run("fix(0.5, 0, 0)")
 
 
+# -- IEEE-754 ----------------------------------------------------------------------
+
+def test_float_pack_golden_and_viz() -> None:
+    from calcutron.engine.viz import FloatBitsViz
+
+    session = Session()
+    outcome = session.evaluate("float32(1.5)")
+    assert outcome.value is not None
+    assert outcome.value.number == 0x3FC00000
+    assert outcome.value.declared_width == 32
+    viz = outcome.value.viz
+    assert isinstance(viz, FloatBitsViz)
+    assert (viz.width, viz.exp_width, viz.man_width) == (32, 8, 23)
+    assert viz.hex_text == "0x3FC0_0000"
+    assert viz.exponent_text == "127 - bias 127 = 2^0"
+    assert viz.mantissa_text == "1.5"
+    assert viz.rounded is False
+    assert outcome.value.note == "float32 stores 1.5"
+
+
+def test_float32_rounds_and_reports_it() -> None:
+    from calcutron.engine.viz import FloatBitsViz
+
+    session = Session()
+    outcome = session.evaluate("float32(0.1)")
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, FloatBitsViz)
+    assert viz.rounded is True
+    assert viz.stored_text == "0.100000001"
+    assert viz.exact_text == "0.1"
+
+
+def test_unfloat_roundtrip_and_subnormal() -> None:
+    from calcutron.engine.viz import FloatBitsViz
+
+    assert run("unfloat32(0x3FC00000)") == "1.5"
+    assert run("unfloat64(float64(pi))") == "3.14159265359"
+    session = Session()
+    outcome = session.evaluate("unfloat32(1)")  # smallest positive subnormal
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, FloatBitsViz)
+    assert "subnormal" in viz.exponent_text
+    assert viz.rounded is False
+
+
+def test_float_slice_extracts_fields() -> None:
+    assert run("float32(1.5)[30:23]") == "127"  # the exponent field
+    assert run("float32(-1.5)[31]") == "1"  # the sign bit
+
+
+def test_float_domain_errors() -> None:
+    for text in ("float32(1e300)", "unfloat32(0x7F800000)",  # inf pattern
+                 "unfloat32(0x7FC00000)",  # nan pattern
+                 "unfloat32(1.5)"):
+        with pytest.raises(EvalError):
+            run(text)
+
+
 def test_hdl_width_and_slicing_flow() -> None:
     session = Session()
     session.evaluate("x = 8'hA5")

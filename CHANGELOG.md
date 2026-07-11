@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New `float32()`/`float64()`/`unfloat32()`/`unfloat64()` functions: the
+  IEEE-754 bit pattern of a value as an integer (and back), with a viz card
+  showing the sign/exponent/mantissa cell bands and decoded fields — usable
+  at any word size, unlike the passive 32/64-bit float view, and pasteable
+  into HDL as a plain integer.
 - History context menu (right-click an entry): copy result, copy expression,
   copy as hex/dec/bin (for integer results, in the current word size),
   recall, and delete entry (also removed from the persisted history).
