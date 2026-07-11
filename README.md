@@ -7,7 +7,8 @@ Python and PySide6. Runs on Windows and Linux.
 
 Everything is typed into one input field — no button grids. One unified,
 modeless grammar: `**` is always power, `^` is always XOR, and any integer
-result automatically shows hex, decimal, binary, and a clickable bit panel.
+result automatically shows hex, decimal, binary, and a clickable bit panel —
+toggling a bit writes the edited value straight back into the input line.
 A live preview under the input shows the parsed interpretation and the result
 on every keystroke, before you press Enter.
 
@@ -21,7 +22,8 @@ uv run calcutron -e help         # the built-in overview
 
 Or grab a standalone build (no Python needed) from CI artifacts: unzip and run
 `calcutron`/`calcutron.exe`. Windows SmartScreen will warn on the unsigned
-binary — this is a known v1 limitation.
+binary — this is a known v1 limitation. `calcutron --version` prints the
+version; release history lives in [CHANGELOG.md](CHANGELOG.md).
 
 ## The language
 
@@ -62,6 +64,25 @@ Notable rules (all covered by tests):
   word size (8/16/32/64, status bar); plain arithmetic is never masked.
 - `>>` is logical when unsigned, arithmetic when signed (status-bar toggle).
 
+## Display
+
+Every status-bar item is clickable (or use its shortcut) and takes effect
+immediately — existing history entries re-render in place:
+
+- **Result base** (DEC/HEX/BIN, Alt+B): integer results in the history pane
+  and live preview render in the chosen base — `1020` ↔ `0x3FC` ↔
+  `0b11_1111_1100`. Compact and nibble-grouped; negatives as word-size
+  two's complement. Floats are unaffected.
+- **Notation** (AUTO/SCI/ENG/ENG·SI, Alt+N): applies to floats *and*
+  integers — `10000000` shows as `1e+7` (SCI), `10e+6` (ENG), or `10M`
+  (ENG·SI). AUTO keeps integers exact; the hex/bin base wins over notation.
+- **Word size / signedness** (Alt+W / Alt+S): reinterprets the integer panel
+  and bit grid without re-evaluating anything.
+
+All settings — word size, signedness, deg/rad, notation, result base,
+always-on-top, window geometry — persist across restarts in a plain INI file
+(`%APPDATA%\calcutron` on Windows, `~/.config/calcutron` on Linux).
+
 ## Keyboard
 
 | Key | Action |
@@ -72,7 +93,8 @@ Notable rules (all covered by tests):
 | Ctrl+Shift+C | copy last result |
 | F1 or `help` | help pane (Esc dismisses) |
 | Alt+W / Alt+S | word size / signedness |
-| Alt+D / Alt+N | deg-rad / float notation |
+| Alt+D / Alt+N | deg-rad / notation |
+| Alt+B | result base (dec/hex/bin) |
 | Alt+T | always on top |
 
 `clear` wipes variables and persistent history. History is stored as JSONL in
