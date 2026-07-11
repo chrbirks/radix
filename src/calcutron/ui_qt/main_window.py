@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from calcutron import __version__
 from calcutron.engine.errors import CalcError, IncompleteError
 from calcutron.engine.help import general_help
 from calcutron.history.store import HistoryStore
@@ -52,7 +53,7 @@ class MainWindow(QMainWindow):
         self.recall_index: int | None = None
         self.last_result_text = ""
 
-        self.setWindowTitle("Calcutron-9000")
+        self.setWindowTitle(f"Calcutron-9000 v{__version__}")
         self.setMinimumSize(520, 600)
 
         root = QWidget()

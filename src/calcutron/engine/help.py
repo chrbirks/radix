@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from calcutron import __version__
 from calcutron.engine.functions import CONSTANTS, FUNCTIONS
 
 _OPERATOR_HELP: list[tuple[str, str, str]] = [
@@ -22,7 +23,9 @@ _OPERATOR_HELP: list[tuple[str, str, str]] = [
     ("[]", "Bit slice/test: x[7:4] extracts bits, x[3] tests one.", "0xAB[7:4] = 0xA"),
 ]
 
-_BASICS = """\
+_BASICS = f"""\
+Calcutron-9000 v{__version__}
+
 Type an expression and press Enter. Everything is keyboard-first — no buttons.
 
 Literals   123   1.5   1.5e-9   0xFF   0b1010   0o17   0xFFFF_0000

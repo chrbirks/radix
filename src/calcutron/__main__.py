@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from calcutron import __version__
 from calcutron.engine.errors import CalcError
 from calcutron.session import Session
 
@@ -45,6 +46,9 @@ def run_expression(session: Session, text: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="calcutron", description="Calcutron-9000 calculator")
     parser.add_argument("-e", "--evaluate", metavar="EXPR", help="evaluate once and exit")
+    parser.add_argument(
+        "--version", action="version", version=f"Calcutron-9000 {__version__}"
+    )
     args = parser.parse_args(argv)
     session = Session()
     if args.evaluate is not None:

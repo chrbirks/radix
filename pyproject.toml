@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "calcutron"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Calcutron-9000: keyboard-first scientific + programmer calculator for engineers"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,6 +27,9 @@ dev = [
     "mypy>=1.13",
     "pyinstaller>=6.10",
 ]
+
+[tool.hatch.version]
+path = "src/calcutron/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/calcutron"]
