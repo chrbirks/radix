@@ -78,6 +78,9 @@ class MainWindow(QMainWindow):
         self.help_pane = QTextEdit()
         self.help_pane.setObjectName("helpPane")
         self.help_pane.setReadOnly(True)
+        # No wrapping: aligned columns beat wrapped lines for readability;
+        # a horizontal scrollbar appears when the window is narrower.
+        self.help_pane.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.help_pane.hide()
 
         self.input = InputEdit()

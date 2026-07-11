@@ -83,8 +83,7 @@ def general_help_html(shortcuts: str | None = None) -> str:
         )
         return f'<table cellspacing="0" cellpadding="1">{cells}</table>'
 
-    pre_wrap = '<pre style="white-space:pre-wrap">'  # wrap instead of h-scrolling
-    parts = [f"{pre_wrap}{escape(_BASICS)}</pre>"]
+    parts = [f"<pre>{escape(_BASICS)}</pre>"]
     parts.append("<h3>Operators (lowest to highest precedence)</h3>")
     parts.append(table([(op, f"{summary}  e.g. {ex}") for op, summary, ex in _OPERATOR_HELP]))
     parts.append("<h3>Functions</h3>")
@@ -102,7 +101,7 @@ def general_help_html(shortcuts: str | None = None) -> str:
     parts.append("<p>Constants: " + ", ".join(sorted(CONSTANTS)) + "</p>")
     parts.append('<p>Use help &lt;name&gt; for details, e.g. "help sin" or "help &lt;&lt;".</p>')
     if shortcuts:
-        parts.append(f"{pre_wrap}{escape(shortcuts)}</pre>")
+        parts.append(f"<pre>{escape(shortcuts)}</pre>")
     return "\n".join(parts)
 
 
