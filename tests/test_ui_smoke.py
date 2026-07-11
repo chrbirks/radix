@@ -122,6 +122,16 @@ def test_viz_panel_clock_card(qtbot, window: MainWindow) -> None:  # type: ignor
     assert payload.divisor is None and payload.period_text == "10n"
 
 
+def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from calcutron.engine.viz import MemViz
+
+    _submit(qtbot, window, "mem(3000, 8)")
+    assert window.vizpanel.isVisibleTo(window)
+    payload = window.vizpanel.payload
+    assert isinstance(payload, MemViz)
+    assert payload.addressable == 4096
+
+
 def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "help")
     assert window.help_pane.isVisibleTo(window)

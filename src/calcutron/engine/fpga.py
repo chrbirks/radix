@@ -18,7 +18,7 @@ from calcutron.engine.functions import (
     _register,
 )
 from calcutron.engine.values import Number, Value
-from calcutron.engine.viz import ClockViz, FixedPointViz
+from calcutron.engine.viz import ClockViz, FixedPointViz, MemViz
 
 MAX_MASK_BITS = 1_000_000
 
@@ -174,6 +174,42 @@ def _clkdiv(args: list[Number], ctx: EvalContext) -> Value:
     return Value(divisor, note=note, viz=viz)
 
 
+# -- memory sizing ---------------------------------------------------------------
+
+
+def _binary_size(bits: int) -> str:
+    size = bits / 8
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if size < 1024:
+            return f"{size:.4g} {unit}"
+        size /= 1024
+    return f"{size:.4g} PiB"
+
+
+def _mem(args: list[Number], ctx: EvalContext) -> Value:
+    """Memory sizing: depth x width -> total bits, with addressing metadata."""
+    depth = _int_arg(args, 0, "mem")
+    width = _int_arg(args, 1, "mem")
+    if depth <= 0 or width <= 0:
+        raise FunctionDomainError("mem: depth and width must be positive")
+    addr_bits = (depth - 1).bit_length()
+    addressable = 1 << addr_bits
+    total_bits = depth * width
+    utilization = depth / addressable
+    viz = MemViz(
+        depth=depth,
+        width=width,
+        addr_bits=addr_bits,
+        addressable=addressable,
+        total_bits=total_bits,
+        bytes_text=_binary_size(total_bits),
+        utilization=utilization,
+        util_text=f"{utilization * 100:.0f}%",
+    )
+    note = f"addr {addr_bits} bits, {viz.bytes_text}"
+    return Value(total_bits, note=note, viz=viz)
+
+
 # -- fixed-point Qm.n --------------------------------------------------------------
 
 
@@ -233,6 +269,7 @@ def _unfix(args: list[Number], ctx: EvalContext) -> Value:
 
 _BITS = "Bit utilities"
 _CLOCK = "Clock & units"
+_MEM = "Memory"
 _FIXED = "Fixed-point"
 
 _TOOLKIT: list[tuple[str, tuple[int, int], str, str, str, str, Handler]] = [
@@ -269,6 +306,9 @@ _TOOLKIT: list[tuple[str, tuple[int, int], str, str, str, str, Handler]] = [
     ("clkdiv", (2, 2), "f_clk, f_target", _CLOCK,
      "Nearest integer divider round(f_clk/f_target), with achieved-rate error.",
      "clkdiv(50M, 115200) = 434", _clkdiv),
+    ("mem", (2, 2), "depth, width", _MEM,
+     "RAM/ROM sizing: total bits, address width, capacity in bytes.",
+     "mem(4096, 36) = 147456", _mem),
     ("fix", (3, 3), "value, m, n", _FIXED,
      "Real -> fixed-point Qm.n raw value (two's complement).",
      "fix(0.7071, 1, 15) = 0x5A82", _fix),

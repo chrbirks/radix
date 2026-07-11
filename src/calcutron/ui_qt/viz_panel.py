@@ -12,7 +12,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent
 from PySide6.QtWidgets import QWidget
 
-from calcutron.engine.viz import ClockViz, FixedPointViz, VizPayload
+from calcutron.engine.viz import ClockViz, FixedPointViz, MemViz, VizPayload
 from calcutron.ui_qt.theme import Palette
 
 VIZ_CELL = 18
@@ -48,6 +48,8 @@ class VizPanel(QWidget):
         elif isinstance(payload, ClockViz):
             lines = 2 if payload.divisor is not None else 1
             self.setFixedHeight(8 + lines * LINE_H + 10)
+        elif isinstance(payload, MemViz):
+            self.setFixedHeight(8 + 2 * LINE_H + 10)
         self.setVisible(payload is not None)
         self.update()
 
@@ -61,7 +63,41 @@ class VizPanel(QWidget):
             self._paint_fixed(painter, self.payload)
         elif isinstance(self.payload, ClockViz):
             self._paint_clock(painter, self.payload)
+        elif isinstance(self.payload, MemViz):
+            self._paint_mem(painter, self.payload)
         painter.end()
+
+    # -- memory sizing ------------------------------------------------------------
+
+    def _paint_mem(self, painter: QPainter, viz: MemViz) -> None:
+        p = self.palette_tokens
+        font = painter.font()
+        font.setPixelSize(15)
+        painter.setFont(font)
+        painter.setPen(QColor(p.text))
+        line = (
+            f"{viz.depth} x {viz.width} bit    addr {viz.addr_bits} bits"
+            f"    {viz.total_bits} bits = {viz.bytes_text}"
+        )
+        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+                         Qt.AlignmentFlag.AlignVCenter, line)
+        # Address-space utilization bar: full track = 2^addr_bits entries.
+        y = 8 + LINE_H + (LINE_H - METER_H) / 2
+        track_w = 200
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(p.bit_off))
+        painter.drawRoundedRect(QRectF(MARGIN, y, track_w, METER_H), 3, 3)
+        full = viz.utilization >= 1.0
+        painter.setBrush(QColor(p.accent if full else p.bit_changed))
+        painter.drawRoundedRect(QRectF(MARGIN, y, track_w * viz.utilization, METER_H), 3, 3)
+        painter.setPen(QColor(p.muted))
+        label = f"{viz.depth} / {viz.addressable} addressable ({viz.util_text})"
+        if full:
+            label += "  power of two"
+        painter.drawText(
+            QRectF(MARGIN + track_w + 10, 8 + LINE_H, self.width() - MARGIN, LINE_H),
+            Qt.AlignmentFlag.AlignVCenter, label,
+        )
 
     # -- clock / divider ---------------------------------------------------------
 

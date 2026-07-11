@@ -136,6 +136,30 @@ def test_period_freq_attach_clock_viz() -> None:
     assert (viz.freq_text, viz.period_text) == ("125M", "8n")
 
 
+def test_mem_golden_and_viz() -> None:
+    from calcutron.engine.viz import MemViz
+
+    assert run("mem(4096, 36)") == "147456"
+    session = Session()
+    outcome = session.evaluate("mem(4096, 36)")
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, MemViz)
+    assert (viz.addr_bits, viz.addressable) == (12, 4096)
+    assert viz.bytes_text == "18 KiB"
+    assert viz.utilization == 1.0
+    assert outcome.value.note == "addr 12 bits, 18 KiB"
+
+    outcome = session.evaluate("mem(3000, 8)")
+    viz = outcome.value.viz if outcome.value else None
+    assert isinstance(viz, MemViz)
+    assert (viz.addr_bits, viz.addressable) == (12, 4096)
+    assert 0.72 < viz.utilization < 0.74 and viz.util_text == "73%"
+
+    with pytest.raises(EvalError, match="positive"):
+        run("mem(0, 8)")
+
+
 def test_fix_attaches_viz_payload() -> None:
     from calcutron.engine.viz import FixedPointViz
 

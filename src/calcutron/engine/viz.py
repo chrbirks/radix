@@ -44,4 +44,18 @@ class ClockViz:
     error_ppm: float | None = None  # signed achieved-vs-target error
 
 
-VizPayload: TypeAlias = FixedPointViz | ClockViz
+@dataclass(frozen=True)
+class MemViz:
+    """Memory sizing for mem(depth, width)."""
+
+    depth: int
+    width: int
+    addr_bits: int  # clog2(depth)
+    addressable: int  # 2**addr_bits
+    total_bits: int  # depth * width
+    bytes_text: str  # human capacity, e.g. "18 KiB"
+    utilization: float  # depth / addressable; < 1 flags non-power-of-two waste
+    util_text: str  # pre-formatted, e.g. "73%"
+
+
+VizPayload: TypeAlias = FixedPointViz | ClockViz | MemViz
