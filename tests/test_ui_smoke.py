@@ -132,6 +132,43 @@ def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[
     assert payload.addressable == 4096
 
 
+def test_history_context_actions(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtWidgets import QApplication
+
+    _submit(qtbot, window, "x = 0xFF")
+    _submit(qtbot, window, "sin(1)")
+    window._history_action("copy_hex", 0)
+    assert QApplication.clipboard().text() == "0xFF"
+    window._history_action("copy_result", 0)
+    assert QApplication.clipboard().text() == "255"  # assignment prefix stripped
+    window._history_action("copy_expression", 1)
+    assert QApplication.clipboard().text() == "sin(1)"
+    window._history_action("recall", 1)
+    assert window.input.text() == "sin(1)"
+    window._history_action("delete", 0)
+    assert len(window.model.entries) == 1
+    assert window.model.entries[0].expression == "sin(1)"
+
+
+def test_history_delete_rewrites_store(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from calcutron.history.store import HistoryStore
+
+    QSettings.setPath(
+        QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path / "settings")
+    )
+    store = HistoryStore(tmp_path / "history.jsonl")
+    win = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win)
+    _submit(qtbot, win, "1 + 1")
+    _submit(qtbot, win, "2 + 2")
+    win._history_action("delete", 0)
+    remaining = store.load()
+    assert [e.expression for e in remaining] == ["2 + 2"]
+    assert remaining[0].timestamp > 0
+
+
 def test_vars_pane_lists_and_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "x = 0xFF")
     _submit(qtbot, window, "vars")

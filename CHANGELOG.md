@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- History context menu (right-click an entry): copy result, copy expression,
+  copy as hex/dec/bin (for integer results, in the current word size),
+  recall, and delete entry (also removed from the persisted history).
 - Variables inspector: `vars` (or Alt+V) opens a pane listing every defined
   variable rendered in the current base/notation; click a row to insert the
   name, right-click to delete. New `del <name>` command removes a variable

@@ -64,6 +64,19 @@ class HistoryStore:
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record) + "\n")
 
+    def rewrite(self, entries: list[StoredEntry]) -> None:
+        """Replace the file's contents (after deleting an entry from the UI)."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("w", encoding="utf-8") as fh:
+            for entry in entries:
+                record = {
+                    "expression": entry.expression,
+                    "result": entry.result,
+                    "note": entry.note,
+                    "timestamp": entry.timestamp,
+                }
+                fh.write(json.dumps(record) + "\n")
+
     def clear(self) -> None:
         if self.path.exists():
             self.path.unlink()

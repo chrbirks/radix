@@ -36,6 +36,7 @@ class HistoryEntry:
     # value=None and simply keep their recorded text.
     value: Value | None = None
     prefix: str = ""  # "x ← " for assignments, else ""
+    timestamp: float = 0.0  # persistence only; not rendered
 
 
 class HistoryModel(QAbstractListModel):
@@ -67,6 +68,12 @@ class HistoryModel(QAbstractListModel):
         self.beginResetModel()
         self.entries.clear()
         self.endResetModel()
+
+    def remove(self, row: int) -> None:
+        if 0 <= row < len(self.entries):
+            self.beginRemoveRows(QModelIndex(), row, row)
+            del self.entries[row]
+            self.endRemoveRows()
 
     def reformat(self, primary: Callable[[Value], str]) -> None:
         """Rewrite results after a display setting (base/notation/…) change."""

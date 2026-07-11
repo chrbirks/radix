@@ -8,6 +8,8 @@ Session — the UI never computes anything itself.
 
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QAction, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
@@ -27,7 +29,7 @@ from calcutron import __version__
 from calcutron.engine.errors import CalcError, IncompleteError
 from calcutron.engine.help import general_help_html
 from calcutron.engine.values import Value
-from calcutron.history.store import HistoryStore
+from calcutron.history.store import HistoryStore, StoredEntry
 from calcutron.session import Session
 from calcutron.ui_qt.bit_panel import IntegerView
 from calcutron.ui_qt.completer import Completer
@@ -80,6 +82,8 @@ class MainWindow(QMainWindow):
         self.history_view.setSelectionMode(QListView.SelectionMode.SingleSelection)
         self.history_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.history_view.doubleClicked.connect(self._recall_from_view)
+        self.history_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.history_view.customContextMenuRequested.connect(self._history_context_menu)
 
         self.help_pane = QTextEdit()
         self.help_pane.setObjectName("helpPane")
@@ -142,7 +146,9 @@ class MainWindow(QMainWindow):
             load_session(self.session)
             self._refresh_status()
             for old in self.store.load():
-                self.model.append(HistoryEntry(old.expression, old.result, old.note))
+                self.model.append(
+                    HistoryEntry(old.expression, old.result, old.note, timestamp=old.timestamp)
+                )
             self.history_view.scrollToBottom()
             s = app_settings()
             geometry = s.value("geometry")
@@ -250,6 +256,7 @@ class MainWindow(QMainWindow):
                 outcome.value.note or "",
                 value=outcome.value,
                 prefix=prefix,
+                timestamp=time.time(),
             )
         )
         if self.store is not None:
@@ -372,6 +379,63 @@ class MainWindow(QMainWindow):
             return
         self.completer.suppress_next()  # recalled text must not pop completions
         self.input.setText(entries[self.recall_index].expression)
+
+    def _history_context_menu(self, pos: QPoint) -> None:
+        index = self.history_view.indexAt(pos)
+        if not index.isValid():
+            return
+        row = index.row()
+        entry = self.model.entries[row]
+        menu = QMenu(self)
+        actions: dict[QAction, str] = {}
+
+        def add(label: str, action_id: str) -> None:
+            actions[menu.addAction(label)] = action_id
+
+        add("copy result", "copy_result")
+        add("copy expression", "copy_expression")
+        if entry.value is not None and isinstance(entry.value.number, int):
+            menu.addSeparator()
+            add("copy as hex", "copy_hex")
+            add("copy as dec", "copy_dec")
+            add("copy as bin", "copy_bin")
+        menu.addSeparator()
+        add("recall", "recall")
+        add("delete entry", "delete")
+        chosen = menu.exec(self.history_view.viewport().mapToGlobal(pos))
+        if chosen is not None:
+            self._history_action(actions[chosen], row)
+
+    def _history_action(self, action: str, row: int) -> None:
+        entry = self.model.entries[row]
+        clipboard = QApplication.clipboard()
+        if action == "copy_result":
+            text = entry.result[len(entry.prefix):] if entry.prefix else entry.result
+            clipboard.setText(text)
+            self._toast(f"copied {text}")
+        elif action == "copy_expression":
+            clipboard.setText(entry.expression)
+            self._toast("expression copied")
+        elif action in ("copy_hex", "copy_dec", "copy_bin") and entry.value is not None:
+            text = self.session.format_value(entry.value, base=action.removeprefix("copy_"))
+            clipboard.setText(text)
+            self._toast(f"copied {text}")
+        elif action == "recall":
+            self._set_input(entry.expression)
+        elif action == "delete":
+            self.model.remove(row)
+            self._persist_history()
+            self._toast("entry deleted")
+
+    def _persist_history(self) -> None:
+        if self.store is None:
+            return
+        self.store.rewrite(
+            [
+                StoredEntry(e.expression, e.result, e.note, e.timestamp)
+                for e in self.model.entries
+            ]
+        )
 
     def _recall_from_view(self, index: object) -> None:
         row = index.row()  # type: ignore[attr-defined]
