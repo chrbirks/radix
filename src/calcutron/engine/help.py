@@ -1,6 +1,13 @@
-"""Help text, generated from the same tables the evaluator dispatches through."""
+"""Help text, generated from the same tables the evaluator dispatches through.
+
+Two renderings of the same content: plain text for the CLI (`-e help`) and a
+rich-text variant for the GUI pane, where a real table keeps the signature and
+summary columns aligned at any window width.
+"""
 
 from __future__ import annotations
+
+from html import escape
 
 from calcutron import __version__
 from calcutron.engine.functions import CONSTANTS, FUNCTIONS
@@ -50,15 +57,13 @@ def general_help(shortcuts: str | None = None) -> str:
         lines.append(f"  {op:4} {summary}  e.g. {example}")
     lines.append("")
     lines.append("Functions")
-    names = sorted(FUNCTIONS)
-    row: list[str] = []
-    for name in names:
-        row.append(name)
-        if len(row) == 8:
-            lines.append("  " + "  ".join(row))
-            row = []
-    if row:
-        lines.append("  " + "  ".join(row))
+    width = max(len(spec.signature) for spec in FUNCTIONS.values()) + 3
+    for category in dict.fromkeys(spec.category for spec in FUNCTIONS.values()):
+        lines.append(f"{category}")
+        for spec in FUNCTIONS.values():
+            if spec.category == category:
+                lines.append(f"  {spec.signature:{width}}{spec.summary}")
+        lines.append("")
     lines.append("Constants: " + ", ".join(sorted(CONSTANTS)))
     lines.append('Use help <name> for details, e.g. "help sin" or "help <<".')
     if shortcuts:
@@ -67,13 +72,49 @@ def general_help(shortcuts: str | None = None) -> str:
     return "\n".join(lines)
 
 
+def general_help_html(shortcuts: str | None = None) -> str:
+    """Rich-text variant of general_help() for the GUI pane (same sources)."""
+
+    def table(rows: list[tuple[str, str]]) -> str:
+        cells = "".join(
+            f'<tr><td style="white-space:pre">{escape(left)}&nbsp;&nbsp;&nbsp;</td>'
+            f"<td>{escape(right)}</td></tr>"
+            for left, right in rows
+        )
+        return f'<table cellspacing="0" cellpadding="1">{cells}</table>'
+
+    pre_wrap = '<pre style="white-space:pre-wrap">'  # wrap instead of h-scrolling
+    parts = [f"{pre_wrap}{escape(_BASICS)}</pre>"]
+    parts.append("<h3>Operators (lowest to highest precedence)</h3>")
+    parts.append(table([(op, f"{summary}  e.g. {ex}") for op, summary, ex in _OPERATOR_HELP]))
+    parts.append("<h3>Functions</h3>")
+    for category in dict.fromkeys(spec.category for spec in FUNCTIONS.values()):
+        parts.append(f"<p><b>{escape(category)}</b></p>")
+        parts.append(
+            table(
+                [
+                    (spec.signature, spec.summary)
+                    for spec in FUNCTIONS.values()
+                    if spec.category == category
+                ]
+            )
+        )
+    parts.append("<p>Constants: " + ", ".join(sorted(CONSTANTS)) + "</p>")
+    parts.append('<p>Use help &lt;name&gt; for details, e.g. "help sin" or "help &lt;&lt;".</p>')
+    if shortcuts:
+        parts.append(f"{pre_wrap}{escape(shortcuts)}</pre>")
+    return "\n".join(parts)
+
+
 def topic_help(topic: str) -> str | None:
     """Help for one function or operator; None if the topic is unknown."""
     spec = FUNCTIONS.get(topic)
     if spec is not None:
         lo, hi = spec.arity
         arity = str(lo) if lo == hi else f"{lo}–{hi}"
-        return f"{spec.name}(…) — {spec.summary}  ({arity} argument(s))\nExample: {spec.example}"
+        return (
+            f"{spec.signature} — {spec.summary}  ({arity} argument(s))\nExample: {spec.example}"
+        )
     if topic in CONSTANTS:
         return f"{topic} — {CONSTANTS[topic][1]}"
     for op, summary, example in _OPERATOR_HELP:

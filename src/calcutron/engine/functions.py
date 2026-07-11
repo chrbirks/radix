@@ -33,9 +33,15 @@ class EvalContext:
 class FunctionSpec:
     name: str
     arity: tuple[int, int]  # (min, max) argument count
+    params: str  # display argument names, e.g. "x" or "value, m, n"
+    category: str  # help-pane grouping, e.g. "Bit utilities"
     summary: str
     example: str
     handler: Handler
+
+    @property
+    def signature(self) -> str:
+        return f"{self.name}({self.params})"
 
 
 class FunctionDomainError(ValueError):
@@ -121,35 +127,54 @@ FUNCTIONS: dict[str, FunctionSpec] = {}
 def _register(
     name: str,
     arity: tuple[int, int],
+    params: str,
+    category: str,
     summary: str,
     example: str,
     handler: Handler,
 ) -> None:
-    FUNCTIONS[name] = FunctionSpec(name, arity, summary, example, handler)
+    FUNCTIONS[name] = FunctionSpec(name, arity, params, category, summary, example, handler)
 
+
+_TRIG = "Trigonometry"
+_HYP = "Hyperbolic"
+_LOG = "Logarithms & exponentials"
+_ROUND = "Roots & rounding"
 
 _trig_note = "uses the current deg/rad setting"
 _inv_note = "result in the current angle unit"
-_register("sin", (1, 1), f"Sine ({_trig_note}).", "sin(pi/4)", _trig(mpmath.sin))
-_register("cos", (1, 1), f"Cosine ({_trig_note}).", "cos(0)", _trig(mpmath.cos))
-_register("tan", (1, 1), f"Tangent ({_trig_note}).", "tan(pi/8)", _trig(mpmath.tan))
-_register("asin", (1, 1), f"Inverse sine; {_inv_note}.", "asin(0.5)", _inverse_trig(mpmath.asin))
-_register("acos", (1, 1), f"Inverse cosine; {_inv_note}.", "acos(0.5)", _inverse_trig(mpmath.acos))
-_register("atan", (1, 1), f"Inverse tangent; {_inv_note}.", "atan(1)", _inverse_trig(mpmath.atan))
-_register("sinh", (1, 1), "Hyperbolic sine.", "sinh(1)", _plain(mpmath.sinh, "sinh"))
-_register("cosh", (1, 1), "Hyperbolic cosine.", "cosh(1)", _plain(mpmath.cosh, "cosh"))
-_register("tanh", (1, 1), "Hyperbolic tangent.", "tanh(1)", _plain(mpmath.tanh, "tanh"))
-_register("log", (1, 1), "Base-10 logarithm.", "log(1000)", _plain(mpmath.log10, "log"))
-_register("ln", (1, 1), "Natural logarithm.", "ln(e)", _plain(mpmath.log, "ln"))
+_register("sin", (1, 1), "x", _TRIG, f"Sine ({_trig_note}).", "sin(pi/4)", _trig(mpmath.sin))
+_register("cos", (1, 1), "x", _TRIG, f"Cosine ({_trig_note}).", "cos(0)", _trig(mpmath.cos))
+_register("tan", (1, 1), "x", _TRIG, f"Tangent ({_trig_note}).", "tan(pi/8)", _trig(mpmath.tan))
 _register(
-    "log2", (1, 1), "Base-2 logarithm.", "log2(1024)", _plain(lambda x: mpmath.log(x, 2), "log2")
+    "asin", (1, 1), "x", _TRIG,
+    f"Inverse sine; {_inv_note}.", "asin(0.5)", _inverse_trig(mpmath.asin),
 )
-_register("exp", (1, 1), "e raised to the argument.", "exp(1)", _plain(mpmath.exp, "exp"))
-_register("sqrt", (1, 1), "Square root (exact for perfect squares).", "sqrt(2)", _sqrt)
-_register("abs", (1, 1), "Absolute value.", "abs(-4)", _abs)
-_register("floor", (1, 1), "Round down to an integer.", "floor(2.7)", _floor)
-_register("ceil", (1, 1), "Round up to an integer.", "ceil(2.1)", _ceil)
-_register("round", (1, 1), "Round to the nearest integer.", "round(2.5)", _round)
+_register(
+    "acos", (1, 1), "x", _TRIG,
+    f"Inverse cosine; {_inv_note}.", "acos(0.5)", _inverse_trig(mpmath.acos),
+)
+_register(
+    "atan", (1, 1), "x", _TRIG,
+    f"Inverse tangent; {_inv_note}.", "atan(1)", _inverse_trig(mpmath.atan),
+)
+_register("sinh", (1, 1), "x", _HYP, "Hyperbolic sine.", "sinh(1)", _plain(mpmath.sinh, "sinh"))
+_register("cosh", (1, 1), "x", _HYP, "Hyperbolic cosine.", "cosh(1)", _plain(mpmath.cosh, "cosh"))
+_register("tanh", (1, 1), "x", _HYP, "Hyperbolic tangent.", "tanh(1)", _plain(mpmath.tanh, "tanh"))
+_register("log", (1, 1), "x", _LOG, "Base-10 logarithm.", "log(1000)", _plain(mpmath.log10, "log"))
+_register("ln", (1, 1), "x", _LOG, "Natural logarithm.", "ln(e)", _plain(mpmath.log, "ln"))
+_register(
+    "log2", (1, 1), "x", _LOG,
+    "Base-2 logarithm.", "log2(1024)", _plain(lambda x: mpmath.log(x, 2), "log2"),
+)
+_register(
+    "exp", (1, 1), "x", _LOG, "e raised to the argument.", "exp(1)", _plain(mpmath.exp, "exp")
+)
+_register("sqrt", (1, 1), "x", _ROUND, "Square root (exact for perfect squares).", "sqrt(2)", _sqrt)
+_register("abs", (1, 1), "x", _ROUND, "Absolute value.", "abs(-4)", _abs)
+_register("floor", (1, 1), "x", _ROUND, "Round down to an integer.", "floor(2.7)", _floor)
+_register("ceil", (1, 1), "x", _ROUND, "Round up to an integer.", "ceil(2.1)", _ceil)
+_register("round", (1, 1), "x", _ROUND, "Round to the nearest integer.", "round(2.5)", _round)
 
 CONSTANTS: dict[str, tuple[Number, str]] = {
     "pi": (mpmath.mpf(0), "The circle constant π."),  # filled in below after dps set

@@ -182,39 +182,52 @@ def _unfix(args: list[Number], ctx: EvalContext) -> Value:
     return Value(mpmath.mpf(raw) / (1 << n), note=f"from Q{m}.{n}")
 
 
-_TOOLKIT: list[tuple[str, tuple[int, int], str, str, Handler]] = [
-    ("clog2", (1, 1), "Ceiling log2 — address width for N entries.", "clog2(300) = 9", _clog2),
-    ("flog2", (1, 1), "Floor log2 — index of the highest set bit.", "flog2(300) = 8", _flog2),
-    ("mask", (1, 1), "N low bits set: (1<<n)-1.", "mask(12) = 0xFFF", _mask_fn),
-    ("bit", (1, 1), "Single set bit: 1<<n.", "bit(7) = 0x80", _bit_fn),
-    ("popcount", (1, 1), "Number of set bits (within the word size).",
+_BITS = "Bit utilities"
+_CLOCK = "Clock & units"
+_FIXED = "Fixed-point"
+
+_TOOLKIT: list[tuple[str, tuple[int, int], str, str, str, str, Handler]] = [
+    ("clog2", (1, 1), "n", _BITS,
+     "Ceiling log2 — address width for N entries.", "clog2(300) = 9", _clog2),
+    ("flog2", (1, 1), "n", _BITS,
+     "Floor log2 — index of the highest set bit.", "flog2(300) = 8", _flog2),
+    ("mask", (1, 1), "n", _BITS, "N low bits set: (1<<n)-1.", "mask(12) = 0xFFF", _mask_fn),
+    ("bit", (1, 1), "n", _BITS, "Single set bit: 1<<n.", "bit(7) = 0x80", _bit_fn),
+    ("popcount", (1, 1), "v", _BITS, "Number of set bits (within the word size).",
      "popcount(0xF0F0)", _popcount),
-    ("parity", (1, 1), "XOR of all bits: 1 if odd number set.", "parity(0b1011) = 1", _parity),
-    ("revbits", (1, 2), "Reverse bit order in the word (or in `width` bits).",
+    ("parity", (1, 1), "v", _BITS,
+     "XOR of all bits: 1 if odd number set.", "parity(0b1011) = 1", _parity),
+    ("revbits", (1, 2), "v, width", _BITS, "Reverse bit order in the word (or in `width` bits).",
      "revbits(0b1101, 4) = 0b1011", _revbits),
-    ("byteswap16", (1, 1), "Swap byte order in 16 bits (endianness).",
+    ("byteswap16", (1, 1), "v", _BITS, "Swap byte order in 16 bits (endianness).",
      "byteswap16(0x1234) = 0x3412", _byteswap(16)),
-    ("byteswap32", (1, 1), "Swap byte order in 32 bits (endianness).",
+    ("byteswap32", (1, 1), "v", _BITS, "Swap byte order in 32 bits (endianness).",
      "byteswap32(0xDEADBEEF)", _byteswap(32)),
-    ("byteswap64", (1, 1), "Swap byte order in 64 bits (endianness).",
+    ("byteswap64", (1, 1), "v", _BITS, "Swap byte order in 64 bits (endianness).",
      "byteswap64(0x0123456789ABCDEF)", _byteswap(64)),
-    ("sext", (2, 2), "Sign-extend the low `bits` up to the word size.", "sext(0xFF, 8)", _sext),
-    ("zext", (2, 2), "Zero-extend: keep only the low `bits`.", "zext(0x1FF, 8) = 0xFF", _zext),
-    ("rol", (2, 2), "Rotate left within the word size.", "rol(0x80, 1)", _rotate(True)),
-    ("ror", (2, 2), "Rotate right within the word size.", "ror(1, 1)", _rotate(False)),
-    ("period", (1, 1), "Clock period from frequency: 1/f, shown with SI suffix.",
+    ("sext", (2, 2), "v, bits", _BITS,
+     "Sign-extend the low `bits` up to the word size.", "sext(0xFF, 8)", _sext),
+    ("zext", (2, 2), "v, bits", _BITS,
+     "Zero-extend: keep only the low `bits`.", "zext(0x1FF, 8) = 0xFF", _zext),
+    ("rol", (2, 2), "v, n", _BITS, "Rotate left within the word size.", "rol(0x80, 1)",
+     _rotate(True)),
+    ("ror", (2, 2), "v, n", _BITS, "Rotate right within the word size.", "ror(1, 1)",
+     _rotate(False)),
+    ("period", (1, 1), "f", _CLOCK, "Clock period from frequency: 1/f, shown with SI suffix.",
      "period(100M) = 10n", _period),
-    ("freq", (1, 1), "Frequency from period: 1/t, shown with SI suffix.",
+    ("freq", (1, 1), "t", _CLOCK, "Frequency from period: 1/t, shown with SI suffix.",
      "freq(8n) = 125M", _freq),
-    ("fix", (3, 3), "Real → fixed-point Qm.n raw value (two's complement).",
+    ("fix", (3, 3), "value, m, n", _FIXED,
+     "Real -> fixed-point Qm.n raw value (two's complement).",
      "fix(0.7071, 1, 15) = 0x5A82", _fix),
-    ("unfix", (3, 3), "Fixed-point Qm.n raw value → real.", "unfix(0x5A82, 1, 15)", _unfix),
+    ("unfix", (3, 3), "raw, m, n", _FIXED,
+     "Fixed-point Qm.n raw value -> real.", "unfix(0x5A82, 1, 15)", _unfix),
 ]
 
 
 def register_fpga_functions() -> None:
-    for name, arity, summary, example, handler in _TOOLKIT:
-        _register(name, arity, summary, example, handler)
+    for name, arity, params, category, summary, example, handler in _TOOLKIT:
+        _register(name, arity, params, category, summary, example, handler)
 
 
 register_fpga_functions()

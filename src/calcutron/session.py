@@ -121,7 +121,8 @@ class Session:
                     text = f"no help for {rest!r} — try plain `help` for the overview"
             else:
                 text = help_mod.general_help()
-            return Outcome("help", help_text=text)
+            # target carries the topic so the GUI can tell overview from topic.
+            return Outcome("help", target=rest or None, help_text=text)
         if word == "clear" and not rest:
             if commit:
                 self.variables.clear()

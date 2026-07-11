@@ -109,6 +109,15 @@ def stylesheet(p: Palette, mono: str) -> str:
         padding: 2px 12px 8px 12px;
         font-size: 17px;
     }}
+    QListWidget#completerPopup {{
+        background: {p.surface};
+        color: {p.text};
+        border: 1px solid {p.hairline};
+        border-radius: 4px;
+        padding: 2px;
+        font-size: 17px;
+        outline: none;
+    }}
     QLabel#preview[state="error"] {{
         color: {p.error};
     }}
@@ -153,7 +162,7 @@ def stylesheet(p: Palette, mono: str) -> str:
     QLabel.statusItem:hover {{
         color: {p.accent};
     }}
-    QPlainTextEdit#helpPane {{
+    QTextEdit#helpPane {{
         background: {p.surface};
         color: {p.text};
         border: none;

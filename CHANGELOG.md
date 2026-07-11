@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Autocomplete in the input field: typing an identifier (or Ctrl+Space) pops
+  a list of matching functions, constants, variables, and commands with
+  signatures and one-line summaries. Tab inserts; Enter inserts only after
+  navigating with Up/Down, so plain Enter always evaluates.
+- The `help` overview now groups functions by category (trigonometry, bit
+  utilities, clock & units, fixed-point, …) with the signature and summary
+  of every function; `help <name>` shows real argument names. The GUI help
+  pane renders it as an aligned table.
+
 - Integer result display base (dec/hex/bin) for the history pane and the
   live preview — cycle via the status-bar item or Alt+B. Existing history
   entries re-render in the chosen base; float results are unaffected.

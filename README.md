@@ -10,7 +10,9 @@ modeless grammar: `**` is always power, `^` is always XOR, and any integer
 result automatically shows hex, decimal, binary, and a clickable bit panel —
 toggling a bit writes the edited value straight back into the input line.
 A live preview under the input shows the parsed interpretation and the result
-on every keystroke, before you press Enter.
+on every keystroke, before you press Enter. Typing a name pops autocomplete
+with signatures and summaries (Tab inserts), and `help` shows every function
+grouped by category — both generated from the evaluator's own tables.
 
 ## Quick start
 
@@ -88,7 +90,8 @@ always-on-top, window geometry — persist across restarts in a plain INI file
 | Key | Action |
 | --- | --- |
 | Enter | evaluate |
-| Up / Down | recall history |
+| Tab / Ctrl+Space | insert / open completions |
+| Up / Down | recall history (or navigate completions) |
 | Ctrl+L | clear the history view |
 | Ctrl+Shift+C | copy last result |
 | F1 or `help` | help pane (Esc dismisses) |

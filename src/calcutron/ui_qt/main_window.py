@@ -15,17 +15,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QListView,
     QMainWindow,
-    QPlainTextEdit,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 from calcutron import __version__
 from calcutron.engine.errors import CalcError, IncompleteError
-from calcutron.engine.help import general_help
+from calcutron.engine.help import general_help_html
 from calcutron.history.store import HistoryStore
 from calcutron.session import Session
 from calcutron.ui_qt.bit_panel import IntegerView
+from calcutron.ui_qt.completer import Completer
 from calcutron.ui_qt.highlight import ExprHighlighter
 from calcutron.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
 from calcutron.ui_qt.input_edit import InputEdit
@@ -36,6 +37,7 @@ PREVIEW_DEBOUNCE_MS = 100
 
 SHORTCUT_HELP = """Keyboard shortcuts
   Enter        evaluate          Up / Down    recall history
+  Tab          insert completion Ctrl+Space   open completions
   Ctrl+L       clear history     Ctrl+Shift+C copy last result
   F1 or help   this help         Esc          dismiss help
   Alt+W        cycle word size   Alt+S        toggle signed/unsigned
@@ -73,7 +75,7 @@ class MainWindow(QMainWindow):
         self.history_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.history_view.doubleClicked.connect(self._recall_from_view)
 
-        self.help_pane = QPlainTextEdit()
+        self.help_pane = QTextEdit()
         self.help_pane.setObjectName("helpPane")
         self.help_pane.setReadOnly(True)
         self.help_pane.hide()
@@ -85,6 +87,7 @@ class MainWindow(QMainWindow):
         self.input.textChanged.connect(self._schedule_preview)
         self.input.installEventFilter(self)
         self.highlighter = ExprHighlighter(self.input.document(), palette)
+        self.completer = Completer(self.input, session, palette)
 
         self.preview = QLabel(" ")
         self.preview.setObjectName("preview")
@@ -189,7 +192,8 @@ class MainWindow(QMainWindow):
             self._show_error(exc)
             return
         if outcome.kind == "help":
-            self._show_help(outcome.help_text)
+            # Bare `help` gets the rich overview; `help <name>` the topic text.
+            self._show_help(outcome.help_text if outcome.target else None)
             self.input.clear()
             return
         if outcome.kind == "clear":
@@ -285,8 +289,12 @@ class MainWindow(QMainWindow):
     # -- history recall ---------------------------------------------------------
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if obj is self.input and event.type() == QEvent.Type.FocusOut:
+            self.completer.hide()
         if obj is self.input and event.type() == QEvent.Type.KeyPress:
             assert isinstance(event, QKeyEvent)
+            if self.completer.handle_key(event):
+                return True
             if event.key() == Qt.Key.Key_Up:
                 self._recall(-1)
                 return True
@@ -314,6 +322,7 @@ class MainWindow(QMainWindow):
             self.recall_index = None
             self.input.clear()
             return
+        self.completer.suppress_next()  # recalled text must not pop completions
         self.input.setText(entries[self.recall_index].expression)
 
     def _recall_from_view(self, index: object) -> None:
@@ -321,6 +330,7 @@ class MainWindow(QMainWindow):
         self._set_input(self.model.entries[row].expression)
 
     def _set_input(self, text: str) -> None:
+        self.completer.suppress_next()
         self.input.setText(text)
         self.input.setFocus()
 
@@ -386,7 +396,10 @@ class MainWindow(QMainWindow):
     # -- help / misc -----------------------------------------------------------------
 
     def _show_help(self, text: str | None = None) -> None:
-        self.help_pane.setPlainText(text or general_help(SHORTCUT_HELP))
+        if text is None:
+            self.help_pane.setHtml(general_help_html(SHORTCUT_HELP))
+        else:
+            self.help_pane.setPlainText(text)
         self.history_view.hide()
         self.help_pane.show()
 
@@ -426,7 +439,18 @@ class MainWindow(QMainWindow):
         self.delegate.set_palette(palette)
         self.intview.set_palette(palette)
         self.highlighter.set_palette(palette)
+        self.completer.set_palette(palette)
         self.history_view.viewport().update()
+
+    def moveEvent(self, event: object) -> None:  # keep the popup anchored
+        if hasattr(self, "completer"):
+            self.completer.hide()
+        super().moveEvent(event)  # type: ignore[arg-type]
+
+    def resizeEvent(self, event: object) -> None:
+        if hasattr(self, "completer"):
+            self.completer.hide()
+        super().resizeEvent(event)  # type: ignore[arg-type]
 
 
 class _ClickableLabel(QLabel):

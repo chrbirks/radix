@@ -27,8 +27,10 @@ diagnostics.
 
 - `src/calcutron/engine/` — headless math core (lexer, parser, evaluator,
   formatter, functions/constants tables, FPGA helpers, help generation).
-  `help` text is generated from the same tables the evaluator dispatches
-  through — extend the tables, never hand-write help entries.
+  `help` text (plain + HTML variants) and the input autocomplete popup are
+  generated from the same tables the evaluator dispatches through — extend
+  the tables, never hand-write help entries. Every registered function must
+  supply `params` (display argument names) and `category`.
 - `src/calcutron/session.py` — `Session` façade owning all state (variables,
   `ans`, word size, signedness, deg/rad, notation). `evaluate(text,
   commit=False)` is the side-effect-free preview path.
@@ -66,6 +68,11 @@ diagnostics.
   hardcoded pixels.
 - QSS px fonts leave `QFont.pointSize()` at −1 — scale via
   `history_model._scaled`, never `setPointSizeF` directly.
+- `QFontMetrics.horizontalAdvance` segfaults under `QT_QPA_PLATFORM=offscreen`
+  for glyphs needing font fallback (e.g. `→` U+2192) — keep strings that get
+  measured (function summaries etc.) to ASCII plus glyphs the bundled font
+  has. Also construct `QFontMetrics(font)` yourself; `widget.fontMetrics()`
+  can dangle in PySide6.
 - Pyright "Import could not be resolved" diagnostics for PySide6 etc. are
   IDE-only noise (venv not detected); ruff/mypy/pytest via uv are
   authoritative.

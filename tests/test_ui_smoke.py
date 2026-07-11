@@ -76,6 +76,53 @@ def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ig
     assert not window.help_pane.isVisibleTo(window)
 
 
+def test_completer_pops_and_tab_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    qtbot.keyClicks(window.input, "cl")
+    assert window.completer.popup.isVisible()
+    names = [
+        window.completer.popup.item(i).data(Qt.ItemDataRole.UserRole + 1).name
+        for i in range(window.completer.popup.count())
+    ]
+    assert names == ["clog2", "clear"]
+    qtbot.keyClick(window.input, Qt.Key.Key_Tab)
+    assert window.input.text() == "clog2("
+    assert not window.completer.popup.isVisible()
+
+
+def test_completer_plain_enter_still_evaluates(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    qtbot.keyClicks(window.input, "1+sqrt")  # popup open on the "sqrt" prefix? no: exact match
+    qtbot.keyClicks(window.input, "(9)")
+    qtbot.keyClick(window.input, Qt.Key.Key_Return)
+    assert window.model.entries[-1].result == "4"
+
+
+def test_completer_enter_inserts_only_after_navigation(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    qtbot.keyClicks(window.input, "cl")
+    qtbot.keyClick(window.input, Qt.Key.Key_Down)  # highlight "clear"
+    qtbot.keyClick(window.input, Qt.Key.Key_Return)
+    assert window.input.text() == "clear"
+    assert not window.model.entries  # nothing was evaluated
+
+
+def test_completer_ctrl_space_and_escape(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    qtbot.keyClick(window.input, Qt.Key.Key_Space, Qt.KeyboardModifier.ControlModifier)
+    assert window.completer.popup.isVisible()
+    assert window.completer.popup.count() >= 30  # the full list
+    qtbot.keyClick(window.input, Qt.Key.Key_Escape)
+    assert not window.completer.popup.isVisible()
+    assert window.history_view.isVisibleTo(window)  # help pane untouched
+
+
+def test_completer_ignores_recall_and_suffix_positions(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "sin(1) + 2")
+    qtbot.keyClick(window.input, Qt.Key.Key_Up)  # recall must not pop completions
+    assert window.input.text() == "sin(1) + 2"
+    assert not window.completer.popup.isVisible()
+    window.input.clear()
+    qtbot.keyClicks(window.input, "2p")  # SI-suffix territory, not an identifier
+    assert not window.completer.popup.isVisible()
+
+
 def test_bit_toggle_updates_scratch(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "8")
     window.intview.toggle_bit(0)
