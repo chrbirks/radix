@@ -1,15 +1,15 @@
 """Contextual visualization panel between the preview and the integer panel.
 
-Shows the structured `viz` payload some toolkit results carry (fixed-point
-layouts for now; clock and memory cards ride the same channel). The engine
+Shows the structured `viz` payload some toolkit results carry (fixed-point,
+clock, memory, and IEEE-754 cards all ride the same channel). The engine
 computes every number in the payload — this widget only draws. Hidden when
 the current value has no payload.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPaintEvent
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 from calcutron.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz, VizPayload
@@ -26,6 +26,22 @@ METER_H = 8
 # clkdiv error color thresholds (a UART is unhappy past ~2-3%).
 CLK_ERR_WARN_PPM = 10_000  # 1%
 CLK_ERR_BAD_PPM = 30_000  # 3%
+# clkdiv waveform strip: drawn only while the divider is small enough to read.
+WAVE_MAX_DIV = 16
+WAVE_ROW_H = 18
+WAVE_GAP = 4
+WAVE_LABEL_W = 48
+WAVE_STRIP_H = 2 * WAVE_ROW_H + WAVE_GAP + 6
+
+
+def _has_wave(viz: ClockViz) -> bool:
+    """True when the clock card draws the divided-clock waveform strip."""
+    return (
+        viz.divisor is not None
+        and viz.divisor <= WAVE_MAX_DIV
+        and viz.wave_high is not None
+        and viz.wave_low is not None
+    )
 
 
 class VizPanel(QWidget):
@@ -47,7 +63,8 @@ class VizPanel(QWidget):
             self.setFixedHeight(8 + LINE_H + BAR_H + LINE_H + 10)
         elif isinstance(payload, ClockViz):
             lines = 2 if payload.divisor is not None else 1
-            self.setFixedHeight(8 + lines * LINE_H + 10)
+            wave = WAVE_STRIP_H if _has_wave(payload) else 0
+            self.setFixedHeight(8 + lines * LINE_H + wave + 10)
         elif isinstance(payload, MemViz):
             self.setFixedHeight(8 + 2 * LINE_H + 10)
         self.setVisible(payload is not None)
@@ -132,7 +149,50 @@ class VizPanel(QWidget):
         painter.drawText(QRectF(MARGIN + offset, y, self.width() - 2 * MARGIN - offset, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, f"err {viz.error_text}")
 
-    # -- fixed-point Qm.n -------------------------------------------------------
+        # Waveform strip: two divided-output periods, rising edges aligned at x0.
+        if not _has_wave(viz):
+            return
+        assert viz.wave_high is not None and viz.wave_low is not None
+        high, low = viz.wave_high, viz.wave_low
+        half_units = 4 * viz.divisor  # ref half-cycles across the strip
+        x0 = MARGIN + WAVE_LABEL_W
+        strip_w = min(self.width() - 2 * MARGIN - WAVE_LABEL_W, 420)
+        px = strip_w / half_units
+
+        def wave(y_row: float, spans: list[int]) -> QPolygonF:
+            y_top, y_bot = y_row + 2.0, y_row + WAVE_ROW_H - 2.0
+            pts = [QPointF(x0, y_bot)]
+            x = float(x0)
+            level_high = True
+            for span in spans:
+                y_level = y_top if level_high else y_bot
+                pts.append(QPointF(x, y_level))
+                x += span * px
+                pts.append(QPointF(x, y_level))
+                level_high = not level_high
+            return QPolygonF(pts)
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        rows = (
+            ("clk", [1] * half_units, QPen(QColor(p.muted), 1.5)),
+            (f"/{viz.divisor}", [high, low, high, low], QPen(QColor(p.accent), 2.0)),
+        )
+        for i, (label, spans, pen) in enumerate(rows):
+            y_row = 8 + 2 * LINE_H + i * (WAVE_ROW_H + WAVE_GAP)
+            painter.setPen(QColor(p.muted))
+            painter.drawText(QRectF(MARGIN, y_row, WAVE_LABEL_W - 8, WAVE_ROW_H),
+                             Qt.AlignmentFlag.AlignVCenter, label)
+            painter.setPen(pen)
+            painter.drawPolyline(wave(y_row, spans))
+        if viz.duty_text is not None:
+            duty = f"duty {viz.duty_text}"
+            x_duty = x0 + strip_w + 10
+            if x_duty + painter.fontMetrics().horizontalAdvance(duty) < self.width() - MARGIN:
+                painter.setPen(QColor(p.muted))
+                y_row = 8 + 2 * LINE_H + WAVE_ROW_H + WAVE_GAP
+                painter.drawText(
+                    QRectF(x_duty, y_row, self.width() - MARGIN - x_duty, WAVE_ROW_H),
+                    Qt.AlignmentFlag.AlignVCenter, duty)
 
     # -- fixed-point Qm.n -------------------------------------------------------
 

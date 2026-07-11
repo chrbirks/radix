@@ -18,7 +18,9 @@ Enter; errors underline the offending span right in the input. Typing a name
 pops autocomplete with signatures and summaries (Tab inserts), and `help`
 shows every function grouped by category — both generated from the
 evaluator's own tables. Toolkit results with something worth drawing (Qm.n
-layouts, clock dividers, memory sizing) get a small visualization panel.
+layouts, IEEE-754 fields, clock dividers, memory sizing) get a small
+visualization panel — small clock dividers even draw the reference vs
+divided waveform with the output's duty cycle.
 
 ## Quick start
 

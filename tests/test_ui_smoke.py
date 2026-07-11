@@ -122,6 +122,15 @@ def test_viz_panel_clock_card(qtbot, window: MainWindow) -> None:  # type: ignor
     assert payload.divisor is None and payload.period_text == "10n"
 
 
+def test_viz_panel_clock_wave_heights(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from calcutron.ui_qt.viz_panel import LINE_H, WAVE_STRIP_H
+
+    _submit(qtbot, window, "clkdiv(96M, 12M)")  # divisor 8: waveform drawn
+    assert window.vizpanel.height() == 8 + 2 * LINE_H + WAVE_STRIP_H + 10
+    _submit(qtbot, window, "clkdiv(50M, 115200)")  # divisor 434: text lines only
+    assert window.vizpanel.height() == 8 + 2 * LINE_H + 10
+
+
 def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from calcutron.engine.viz import MemViz
 

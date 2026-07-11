@@ -164,6 +164,13 @@ def _clkdiv(args: list[Number], ctx: EvalContext) -> Value:
     ppm = float((achieved - f_target) / f_target * 1_000_000)
     # Past 1%, percent reads better than ppm.
     error_text = f"{ppm / 10_000:+.2f}%" if abs(ppm) >= 10_000 else f"{ppm:+.0f} ppm"
+    # Divided-output shape in ref half-cycles: a /1 "divider" passes the clock
+    # through; otherwise a single-edge counter stays high ceil(N/2) ref cycles,
+    # so odd dividers get the classic asymmetric duty.
+    if divisor == 1:
+        wave_high, wave_low = 1, 1
+    else:
+        wave_high, wave_low = 2 * ((divisor + 1) // 2), 2 * (divisor // 2)
     viz = ClockViz(
         freq_text=format_si(f_clk),
         period_text=format_si(1 / f_clk),
@@ -172,6 +179,9 @@ def _clkdiv(args: list[Number], ctx: EvalContext) -> Value:
         achieved_text=format_si(achieved),
         error_text=error_text,
         error_ppm=ppm,
+        wave_high=wave_high,
+        wave_low=wave_low,
+        duty_text=f"{100 * wave_high / (wave_high + wave_low):.3g}%",
     )
     note = f"actual {format_si(achieved)}, error {error_text}"
     return Value(divisor, note=note, viz=viz)

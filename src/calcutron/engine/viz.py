@@ -43,6 +43,9 @@ class ClockViz:
     achieved_text: str | None = None  # freq / divisor
     error_text: str | None = None  # pre-formatted, e.g. "+64 ppm" or "-0.79%"
     error_ppm: float | None = None  # signed achieved-vs-target error
+    wave_high: int | None = None  # divided-output high time, in ref half-cycles
+    wave_low: int | None = None  # low time, in ref half-cycles; high+low == 2*divisor
+    duty_text: str | None = None  # pre-formatted, e.g. "50%" or "66.7%"
 
 
 @dataclass(frozen=True)

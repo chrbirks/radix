@@ -119,6 +119,23 @@ def test_clkdiv_golden_and_viz() -> None:
         run("clkdiv(50M, 0)")
 
 
+def test_clkdiv_wave_fields() -> None:
+    from calcutron.engine.viz import ClockViz
+
+    def wave(text: str) -> tuple[int | None, int | None, str | None]:
+        outcome = Session().evaluate(text)
+        assert outcome.value is not None
+        viz = outcome.value.viz
+        assert isinstance(viz, ClockViz)
+        return viz.wave_high, viz.wave_low, viz.duty_text
+
+    assert wave("clkdiv(100M, 33.34M)") == (4, 2, "66.7%")  # odd divider: asymmetric
+    assert wave("clkdiv(100, 50)") == (2, 2, "50%")
+    assert wave("clkdiv(100, 100)") == (1, 1, "50%")  # /1 passes the clock through
+    assert wave("clkdiv(50M, 115200)") == (434, 434, "50%")  # computed even when undrawn
+    assert wave("period(100M)") == (None, None, None)
+
+
 def test_period_freq_attach_clock_viz() -> None:
     from calcutron.engine.viz import ClockViz
 
