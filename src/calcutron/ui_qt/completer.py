@@ -115,18 +115,15 @@ class Completer:
         self.session = session
         self.palette_tokens = palette
         self.navigated = False  # user pressed Up/Down since the popup appeared
+        self.active = False  # popup is showing (isVisible is false in unshown tests)
         self._span = (0, 0)  # start and length of the prefix being completed
         self._suppress = False
 
+        # A plain child widget overlaying the window — never a top-level
+        # window, so no WM focus/positioning games (Wayland-safe).
         self.popup = QListWidget(input_edit.window())
         self.popup.setObjectName("completerPopup")
-        self.popup.setWindowFlags(
-            Qt.WindowType.Tool
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.WindowDoesNotAcceptFocus
-        )
-        self.popup.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.popup.hide()
         self.popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.popup.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.popup.setUniformItemSizes(True)
@@ -166,13 +163,19 @@ class Completer:
             self.hide()  # nothing to offer beyond what is already typed
             return
         self._span = (start, len(prefix))
+        window = self.input.window()
+        if self.popup.parent() is not window:  # input was not in a window at init
+            self.popup.setParent(window)
         self._populate(matches)
         self._position()
         self.popup.show()
+        self.popup.raise_()
+        self.active = True
         self.navigated = False
 
     def hide(self) -> None:
         self.popup.hide()
+        self.active = False
         self.navigated = False
 
     def set_palette(self, palette: Palette) -> None:
@@ -190,7 +193,7 @@ class Completer:
         ):
             self.refresh(force=True)
             return True
-        if not self.popup.isVisible():
+        if not self.active:
             return False
         if key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
             row = self.popup.currentRow() + (1 if key == Qt.Key.Key_Down else -1)
@@ -266,5 +269,7 @@ class Completer:
         cursor = self.input.textCursor()
         cursor.setPosition(self._span[0])
         rect = self.input.cursorRect(cursor)
-        anchor = self.input.viewport().mapToGlobal(rect.topLeft())
-        self.popup.move(anchor.x() - 10, anchor.y() - self.popup.height() - 6)
+        window = self.input.window()
+        anchor = self.input.viewport().mapTo(window, rect.topLeft())
+        x = max(0, min(anchor.x() - 10, window.width() - self.popup.width()))
+        self.popup.move(x, max(0, anchor.y() - self.popup.height() - 6))

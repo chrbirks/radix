@@ -78,7 +78,7 @@ def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ig
 
 def test_completer_pops_and_tab_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     qtbot.keyClicks(window.input, "cl")
-    assert window.completer.popup.isVisible()
+    assert window.completer.active
     names = [
         window.completer.popup.item(i).data(Qt.ItemDataRole.UserRole + 1).name
         for i in range(window.completer.popup.count())
@@ -86,7 +86,7 @@ def test_completer_pops_and_tab_inserts(qtbot, window: MainWindow) -> None:  # t
     assert names == ["clog2", "clear"]
     qtbot.keyClick(window.input, Qt.Key.Key_Tab)
     assert window.input.text() == "clog2("
-    assert not window.completer.popup.isVisible()
+    assert not window.completer.active
 
 
 def test_completer_plain_enter_still_evaluates(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -106,10 +106,10 @@ def test_completer_enter_inserts_only_after_navigation(qtbot, window: MainWindow
 
 def test_completer_ctrl_space_and_escape(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     qtbot.keyClick(window.input, Qt.Key.Key_Space, Qt.KeyboardModifier.ControlModifier)
-    assert window.completer.popup.isVisible()
+    assert window.completer.active
     assert window.completer.popup.count() >= 30  # the full list
     qtbot.keyClick(window.input, Qt.Key.Key_Escape)
-    assert not window.completer.popup.isVisible()
+    assert not window.completer.active
     assert window.history_view.isVisibleTo(window)  # help pane untouched
 
 
@@ -117,10 +117,10 @@ def test_completer_ignores_recall_and_suffix_positions(qtbot, window: MainWindow
     _submit(qtbot, window, "sin(1) + 2")
     qtbot.keyClick(window.input, Qt.Key.Key_Up)  # recall must not pop completions
     assert window.input.text() == "sin(1) + 2"
-    assert not window.completer.popup.isVisible()
+    assert not window.completer.active
     window.input.clear()
     qtbot.keyClicks(window.input, "2p")  # SI-suffix territory, not an identifier
-    assert not window.completer.popup.isVisible()
+    assert not window.completer.active
 
 
 def test_bit_toggle_updates_scratch(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]

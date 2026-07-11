@@ -442,12 +442,7 @@ class MainWindow(QMainWindow):
         self.completer.set_palette(palette)
         self.history_view.viewport().update()
 
-    def moveEvent(self, event: object) -> None:  # keep the popup anchored
-        if hasattr(self, "completer"):
-            self.completer.hide()
-        super().moveEvent(event)  # type: ignore[arg-type]
-
-    def resizeEvent(self, event: object) -> None:
+    def resizeEvent(self, event: object) -> None:  # popup geometry would go stale
         if hasattr(self, "completer"):
             self.completer.hide()
         super().resizeEvent(event)  # type: ignore[arg-type]
