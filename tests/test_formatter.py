@@ -46,6 +46,34 @@ def test_integer_views_grouping_and_signedness() -> None:
     assert views.dec_signed == "-1"
 
 
+def test_float_views_double() -> None:
+    from calcutron.engine.formatter import float_views
+
+    views = float_views(1.0, 64)
+    assert views is not None
+    assert views.bits == 0x3FF0000000000000
+    assert views.hex == "0x3FF0_0000_0000_0000"
+    assert views.sign_text == "+"
+    assert views.exponent_text == "1023 - bias 1023 = 2^0"
+    assert views.mantissa_text == "1"
+
+
+def test_float_views_single_and_specials() -> None:
+    from calcutron.engine.formatter import float_views
+
+    views = float_views(-2.5, 32)
+    assert views is not None
+    assert views.bits == 0xC0200000
+    assert views.sign_text == "-"
+    assert views.exponent_text == "128 - bias 127 = 2^1"
+    assert views.mantissa_text == "1.25"
+    zero = float_views(0.0, 32)
+    assert zero is not None and zero.mantissa_text == "0"
+    huge = float_views(1e300, 32)  # overflows single precision -> +inf pattern
+    assert huge is not None and huge.mantissa_text == "inf"
+    assert float_views(1.0, 16) is None  # no half-precision mapping
+
+
 def test_integer_views_ascii() -> None:
     assert integer_views(0x746F6B31, 32).ascii == "tok1"
     assert integer_views(1020, 16).ascii == ".."  # 0x03 0xFC: non-printable

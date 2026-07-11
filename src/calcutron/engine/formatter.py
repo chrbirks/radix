@@ -12,6 +12,8 @@ display-only concerns that never touch stored values.
 
 from __future__ import annotations
 
+import math
+import struct
 from dataclasses import dataclass
 
 import mpmath
@@ -41,6 +43,64 @@ class IntegerViews:
     binary: str
     ascii: str  # one char per byte, MSB first; "." for non-printable bytes
     fits_word: bool  # False if the true value needed more bits than the word
+
+
+@dataclass(frozen=True)
+class FloatViews:
+    """IEEE-754 decomposition of a real, at the word size's precision.
+
+    Only 32 (single) and 64 (double) bit words map to a float format;
+    float_views() returns None for other word sizes.
+    """
+
+    bits: int  # the raw packed bit pattern
+    width: int  # 32 or 64
+    exp_width: int  # 8 or 11
+    man_width: int  # 23 or 52
+    hex: str  # nibble-grouped hex of the bit pattern
+    sign_text: str  # "+" / "-"
+    exponent_text: str  # decoded, e.g. "1023 - bias 1023 = 2^0"
+    mantissa_text: str  # decoded, e.g. "1.5703125"
+
+
+_FLOAT_FORMATS = {32: (">f", 8, 23, 127), 64: (">d", 11, 52, 1023)}
+
+
+def float_views(value: Number, word_size: int) -> FloatViews | None:
+    if word_size not in _FLOAT_FORMATS:
+        return None
+    pack, exp_width, man_width, bias = _FLOAT_FORMATS[word_size]
+    x = float(value)
+    try:
+        bits = int.from_bytes(struct.pack(pack, x), "big")
+    except OverflowError:  # magnitude beyond single precision: packs to inf
+        bits = int.from_bytes(struct.pack(pack, math.copysign(math.inf, x)), "big")
+    sign = bits >> (word_size - 1)
+    exp_bits = (bits >> man_width) & ((1 << exp_width) - 1)
+    man_bits = bits & ((1 << man_width) - 1)
+    if exp_bits == 0:
+        if man_bits == 0:
+            exponent_text = "0 (zero)"
+            mantissa_text = "0"
+        else:
+            exponent_text = f"0 (subnormal, 2^{1 - bias})"
+            mantissa_text = f"{man_bits / 2**man_width:.10g}"
+    elif exp_bits == (1 << exp_width) - 1:
+        exponent_text = f"{exp_bits} (all ones)"
+        mantissa_text = "inf" if man_bits == 0 else "nan"
+    else:
+        exponent_text = f"{exp_bits} - bias {bias} = 2^{exp_bits - bias}"
+        mantissa_text = f"{1 + man_bits / 2**man_width:.10g}"
+    return FloatViews(
+        bits=bits,
+        width=word_size,
+        exp_width=exp_width,
+        man_width=man_width,
+        hex=_group(f"{bits:X}", 4, min_width=word_size // 4, prefix="0x"),
+        sign_text="-" if sign else "+",
+        exponent_text=exponent_text,
+        mantissa_text=mantissa_text,
+    )
 
 
 def format_number(value: Value, notation: Notation = "auto") -> str:

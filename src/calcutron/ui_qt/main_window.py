@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from calcutron import __version__
 from calcutron.engine.errors import CalcError, IncompleteError
 from calcutron.engine.help import general_help_html
+from calcutron.engine.values import Value
 from calcutron.history.store import HistoryStore
 from calcutron.session import Session
 from calcutron.ui_qt.bit_panel import IntegerView
@@ -228,12 +229,7 @@ class MainWindow(QMainWindow):
         self.recall_index = None
         self.input.clear()
         self.preview.setText(" ")
-        number = outcome.value.number
-        self.intview.show_value(
-            number if isinstance(number, int) else None,
-            self.session.word_size,
-            self.session.signed,
-        )
+        self._panel_follow(outcome.value)
 
     def _schedule_preview(self) -> None:
         self.preview_timer.start()
@@ -271,13 +267,19 @@ class MainWindow(QMainWindow):
             self._set_preview(f"{outcome.normalized} = {result}", error=False)
         self._panel_follow(outcome.value)
 
-    def _panel_follow(self, value: object) -> None:
-        """Point the integer panel at a previewed/committed value (or grey it)."""
-        number = getattr(value, "number", None)
+    def _panel_follow(self, value: Value | None) -> None:
+        """Point the integer panel at a previewed/committed value.
+
+        Integers drive the editable bit grid; reals show the read-only
+        IEEE-754 view (word size 32/64) or grey the panel (8/16).
+        """
+        number = value.number if value is not None else None
+        if isinstance(number, int):
+            self.intview.show_value(number, self.session.word_size, self.session.signed)
+            return
+        float_views = self.session.float_views_for(value) if value is not None else None
         self.intview.show_value(
-            number if isinstance(number, int) else None,
-            self.session.word_size,
-            self.session.signed,
+            None, self.session.word_size, self.session.signed, float_views=float_views
         )
 
     def _set_preview(self, text: str, error: bool) -> None:

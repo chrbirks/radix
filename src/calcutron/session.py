@@ -15,7 +15,9 @@ from calcutron.engine import fpga as _fpga  # noqa: F401 — registers the FPGA 
 from calcutron.engine import help as help_mod
 from calcutron.engine.errors import CalcError, EvalError
 from calcutron.engine.formatter import (
+    FloatViews,
     IntegerViews,
+    float_views,
     format_int_base,
     format_number,
     integer_views,
@@ -144,6 +146,13 @@ class Session:
         if not isinstance(value.number, int):
             return None
         return integer_views(value.number, self.word_size)
+
+    def float_views_for(self, value: Value) -> FloatViews | None:
+        """IEEE-754 decomposition if the value is a real and the word size
+        maps to a float format (32/64), else None."""
+        if isinstance(value.number, int):
+            return None
+        return float_views(value.number, self.word_size)
 
     def preview(self, text: str) -> Outcome:
         """Side-effect-free evaluation for the live preview line.

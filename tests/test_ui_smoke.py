@@ -32,9 +32,30 @@ def test_evaluate_appends_history_and_updates_panel(qtbot, window: MainWindow) -
     assert window.intview.rows["HEX"][1].text().endswith("03FC")
 
 
-def test_float_result_greys_panel(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+def test_float_result_shows_ieee754_view(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "2.5")
+    assert not window.intview.active  # no integer scratch
+    assert window.intview.float_mode is not None
+    assert window.intview.rows["HEX"][1].text() == "0x4004_0000_0000_0000"
+    assert window.intview.rows["SGN"][0].text() == "EXP"  # rows relabeled
+    assert window.intview.rows["SGN"][1].text() == "1024 - bias 1023 = 2^1"
+    # 8/16-bit words have no float format: panel greys as before.
+    window.session.word_size = 8
+    window._update_preview()
     _submit(qtbot, window, "sin(1)")
+    assert window.intview.float_mode is None
     assert not window.intview.active
+    assert window.intview.rows["SGN"][0].text() == "SGN"  # labels restored
+
+
+def test_float_view_is_read_only(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    _submit(qtbot, window, "2.5")
+    assert window.intview.float_mode is not None
+    grid = window.intview.grid_widget
+    assert grid.float_fields == (11, 52)
+    # Toggling/selecting is disabled in float mode; scratch keeps the last int.
+    assert window.intview.scratch == 0xFF
 
 
 def test_assignment_and_recall(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]

@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from calcutron.engine.formatter import format_int_base, integer_views
+from calcutron.engine.formatter import FloatViews, format_int_base, integer_views
 from calcutron.ui_qt.theme import Palette
 
 CELL = 24
@@ -53,19 +53,38 @@ class BitGrid(QWidget):
         self.changed = 0  # bits that flipped vs. the previous value (outlined)
         self.enabled_look = True
         self.selection: tuple[int, int] | None = None  # (hi, lo) drag-selected range
+        # (exp_width, man_width) when showing an IEEE-754 pattern: cells get
+        # sign/exponent/mantissa band colors and become read-only.
+        self.float_fields: tuple[int, int] | None = None
         self._hover_bit: int | None = None
         self._press_bit: int | None = None
         self._dragging = False
         self.setMouseTracking(True)
         self._apply_height()
 
-    def set_state(self, value: int, word_size: int, enabled: bool, changed: int = 0) -> None:
+    def set_state(
+        self,
+        value: int,
+        word_size: int,
+        enabled: bool,
+        changed: int = 0,
+        float_fields: tuple[int, int] | None = None,
+    ) -> None:
         self.value = value
         self.word_size = word_size
         self.enabled_look = enabled
         self.changed = changed
+        self.float_fields = float_fields
         self._apply_height()
         self.update()
+
+    def _field_of(self, bit: int) -> str:
+        """"sign" / "exponent" / "mantissa" for a bit in float mode."""
+        assert self.float_fields is not None
+        _, man_width = self.float_fields
+        if bit == self.word_size - 1:
+            return "sign"
+        return "exponent" if bit >= man_width else "mantissa"
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
@@ -107,11 +126,19 @@ class BitGrid(QWidget):
         on = QColor(p.bit_on if self.enabled_look else p.bit_off)
         off = QColor(p.bit_off)
         off.setAlphaF(0.6 if not self.enabled_look else 1.0)
+        field_colors = {"sign": p.float_sign, "exponent": p.float_exp, "mantissa": p.float_man}
         for bit in range(self.word_size):
             rect = self._cell_rect(bit)
             set_ = (self.value >> bit) & 1
+            if self.float_fields is not None and self.enabled_look:
+                color = QColor(field_colors[self._field_of(bit)])
+                if not set_:
+                    color.setAlphaF(0.22)
+                brush = color
+            else:
+                brush = on if set_ else off
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(on if set_ else off)
+            painter.setBrush(brush)
             painter.drawRoundedRect(rect, 2, 2)
         # Drag-selected range: translucent accent band + text-color outline
         # (visible over both set and unset cells).
@@ -174,7 +201,7 @@ class BitGrid(QWidget):
         self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if not self.enabled_look:
+        if not self.enabled_look or self.float_fields is not None:  # float view: read-only
             return
         self._press_bit = self._bit_at(event.position())
         self._dragging = False
@@ -200,9 +227,12 @@ class BitGrid(QWidget):
             self.setToolTip("")
             return
         state = (self.value >> bit) & 1
-        self.setToolTip(
-            f"bit {bit} = {state}    2^{bit} = {1 << bit}    byte {bit // 8}, nibble {bit // 4}"
-        )
+        if self.float_fields is not None:
+            self.setToolTip(f"bit {bit} = {state}    {self._field_of(bit)}")
+        else:
+            self.setToolTip(
+                f"bit {bit} = {state}    2^{bit} = {1 << bit}    byte {bit // 8}, nibble {bit // 4}"
+            )
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if self.enabled_look and self._press_bit is not None and not self._dragging:
@@ -228,6 +258,7 @@ class IntegerView(QWidget):
         self.word_size = 64
         self.signed = False
         self.active = False
+        self.float_mode: FloatViews | None = None  # read-only IEEE-754 display
 
         self.rows: dict[str, tuple[QLabel, QLabel]] = {}
         self._copy_texts: dict[str, str] = {}
@@ -281,7 +312,13 @@ class IntegerView(QWidget):
 
     # -- state ---------------------------------------------------------------
 
-    def show_value(self, value: int | None, word_size: int, signed: bool) -> None:
+    def show_value(
+        self,
+        value: int | None,
+        word_size: int,
+        signed: bool,
+        float_views: FloatViews | None = None,
+    ) -> None:
         # scratch is kept unmasked: cycling the word size must only change how
         # the value is *displayed*, never destroy its upper bits.
         # A range selection only survives a same-value re-render (settings
@@ -290,6 +327,7 @@ class IntegerView(QWidget):
             self.grid_widget.set_selection(None)
         self.word_size = word_size
         self.signed = signed
+        self.float_mode = float_views if value is None else None
         was_active = self.active
         self.active = value is not None
         if value is not None:
@@ -318,6 +356,9 @@ class IntegerView(QWidget):
         return self.scratch & ((1 << self.word_size) - 1)
 
     def _refresh(self) -> None:
+        if self.float_mode is not None:
+            self._refresh_float(self.float_mode)
+            return
         views = integer_views(self.scratch, self.word_size)
         texts = {
             "HEX": views.hex,
@@ -328,6 +369,7 @@ class IntegerView(QWidget):
         }
         self._copy_texts = texts
         for base, (name, value_label) in self.rows.items():
+            name.setText(base)
             if not self.active:
                 value_label.setText("—")
             elif base == "BIN":
@@ -352,6 +394,38 @@ class IntegerView(QWidget):
         else:
             self.delta_label.setText("")
         self.grid_widget.set_state(self._masked_scratch, self.word_size, self.active, changed)
+        self._update_slice_label()
+
+    def _refresh_float(self, views: FloatViews) -> None:
+        """Read-only IEEE-754 mode: bit pattern + decoded sign/exponent/mantissa.
+
+        The scratch value is untouched — leaving float mode restores the
+        integer view exactly as it was.
+        """
+        names = {"HEX": "HEX", "DEC": "SGN", "SGN": "EXP", "BIN": "MAN", "ASC": ""}
+        texts = {
+            "HEX": views.hex,
+            "DEC": views.sign_text,
+            "SGN": views.exponent_text,
+            "BIN": views.mantissa_text,
+            "ASC": "",
+        }
+        self._copy_texts = texts
+        for base, (name, value_label) in self.rows.items():
+            name.setText(names[base])
+            value_label.setText(texts[base])
+            value_label.setToolTip(texts[base])
+            for w in (name, value_label):
+                w.setProperty("dimmed", "false" if names[base] else "true")
+                w.style().unpolish(w)
+                w.style().polish(w)
+        self.delta_label.setText("")
+        self.grid_widget.set_state(
+            views.bits,
+            views.width,
+            True,
+            float_fields=(views.exp_width, views.man_width),
+        )
         self._update_slice_label()
 
     def _selected_slice(self) -> tuple[int, int, int, int] | None:
@@ -380,7 +454,7 @@ class IntegerView(QWidget):
     # -- actions --------------------------------------------------------------
 
     def copy_base(self, base: str) -> None:
-        if not self.active:
+        if not self.active and self.float_mode is None:
             return
         self._clipboard(self._copy_texts[base])  # plain text, never the rich-text markup
         self.copied.emit(f"{base} copied")

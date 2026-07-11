@@ -27,6 +27,9 @@ class Palette:
     bit_on: str
     bit_off: str
     bit_changed: str  # outline on bits that flipped vs. the previous value
+    float_sign: str  # IEEE-754 field bands in the bit grid
+    float_exp: str
+    float_man: str
     syn_number: str
     syn_function: str
     syn_operator: str
@@ -44,6 +47,9 @@ LIGHT = Palette(
     bit_on="#2563eb",
     bit_off="#d5dae1",
     bit_changed="#d97706",
+    float_sign="#e03131",
+    float_exp="#2b8a3e",
+    float_man="#2563eb",
     syn_number="#0550ae",
     syn_function="#6f42c1",
     syn_operator="#b35900",
@@ -61,6 +67,9 @@ DARK = Palette(
     bit_on="#5b8def",
     bit_off="#3a4048",
     bit_changed="#e8a33d",
+    float_sign="#f06d6d",
+    float_exp="#4fc08d",
+    float_man="#5b8def",
     syn_number="#79c0ff",
     syn_function="#d2a8ff",
     syn_operator="#e0af68",

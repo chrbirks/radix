@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
   QSettings.
 
+- Float results no longer grey the integer panel: at 32/64-bit word size the
+  panel shows the IEEE-754 bit pattern with color-coded sign / exponent /
+  mantissa bands and decoded HEX / SGN / EXP / MAN rows (read-only; copy
+  buttons work — handy for float constants in HDL). 8/16-bit words grey the
+  panel as before.
 - Bit grid: drag across cells to select a bit range — a readout shows the
   field as `[15:8] = 0xBE = 190 (8 bits)`, and "→ input" then inserts the
   slice expression (`0x…[15:8]`). Esc or a plain click clears the selection.
