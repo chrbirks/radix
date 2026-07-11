@@ -138,10 +138,6 @@ class Session:
             return format_int_base(value.number, base, self.word_size)
         return format_number(value, self.notation)
 
-    def format_int(self, number: int) -> str:
-        """An already-known integer in the current display base."""
-        return format_int_base(number, self.int_base, self.word_size)
-
     def views_for(self, value: Value) -> IntegerViews | None:
         """Hex/dec/bin renderings if the value is an integer, else None."""
         if not isinstance(value.number, int):

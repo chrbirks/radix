@@ -151,6 +151,23 @@ def test_result_base_applies_to_history_and_preview(qtbot, window: MainWindow) -
     assert window.model.entries[-2].result == "q ← 255"
 
 
+def test_notation_change_rerenders_history(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "10000000")
+    _submit(qtbot, window, "sin(1)")
+    float_text = window.model.entries[-1].result
+
+    window._cycle_notation()  # auto -> sci
+    assert window.model.entries[-2].result == "1e+7"
+    assert window.model.entries[-1].result == "8.41470984808e-1"  # floats too
+    window._cycle_notation()  # sci -> eng
+    assert window.model.entries[-2].result == "10e+6"
+    window._cycle_notation()  # eng -> eng_si
+    assert window.model.entries[-2].result == "10M"
+    window._cycle_notation()  # eng_si -> auto
+    assert window.model.entries[-2].result == "10000000"
+    assert window.model.entries[-1].result == float_text
+
+
 def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     window.input.setText("0xAB << 4")
     window._update_preview()

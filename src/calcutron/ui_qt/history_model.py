@@ -17,6 +17,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
 
+from calcutron.engine.values import Value
 from calcutron.ui_qt.highlight import classify, color_for
 from calcutron.ui_qt.theme import Palette
 
@@ -30,13 +31,11 @@ class HistoryEntry:
     expression: str
     result: str  # formatted primary text (or "x ← 12" for assignments)
     note: str = ""
-    # Integer entries re-render when the display base changes; dec_text is the
-    # decimal form recorded at commit time (may be SI-suffixed, so it is kept
-    # verbatim rather than regenerated). Entries loaded from disk have
-    # number=None and simply keep their text.
-    number: int | None = None
+    # The raw result value lets entries re-render when a display setting
+    # (base, notation, word size) changes. Entries loaded from disk have
+    # value=None and simply keep their recorded text.
+    value: Value | None = None
     prefix: str = ""  # "x ← " for assignments, else ""
-    dec_text: str = ""
 
 
 class HistoryModel(QAbstractListModel):
@@ -69,13 +68,13 @@ class HistoryModel(QAbstractListModel):
         self.entries.clear()
         self.endResetModel()
 
-    def reformat(self, primary: Callable[[int, HistoryEntry], str]) -> None:
-        """Rewrite integer results after a display-base (or word-size) change."""
+    def reformat(self, primary: Callable[[Value], str]) -> None:
+        """Rewrite results after a display setting (base/notation/…) change."""
         changed = False
         for i, entry in enumerate(self.entries):
-            if entry.number is None:
+            if entry.value is None:
                 continue
-            result = entry.prefix + primary(entry.number, entry)
+            result = entry.prefix + primary(entry.value)
             if result != entry.result:
                 self.entries[i] = replace(entry, result=result)
                 changed = True

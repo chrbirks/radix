@@ -206,15 +206,13 @@ class MainWindow(QMainWindow):
         prefix = f"{outcome.target} ← " if outcome.kind == "assign" else ""
         display = prefix + primary
         self.last_result_text = primary
-        number = outcome.value.number
         self.model.append(
             HistoryEntry(
                 text.strip(),
                 display,
                 outcome.value.note or "",
-                number=number if isinstance(number, int) else None,
+                value=outcome.value,
                 prefix=prefix,
-                dec_text=self.session.format_value(outcome.value, base="dec"),
             )
         )
         if self.store is not None:
@@ -362,11 +360,8 @@ class MainWindow(QMainWindow):
         self._update_preview()
 
     def _reformat_history(self) -> None:
-        """Re-render integer history results in the current display base."""
-        if self.session.int_base == "dec":
-            self.model.reformat(lambda _number, entry: entry.dec_text)
-        else:
-            self.model.reformat(lambda number, _entry: self.session.format_int(number))
+        """Re-render history results under the current display settings."""
+        self.model.reformat(self.session.format_value)
 
     def _refresh_status(self) -> None:
         session = self.session

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live preview — cycle via the status-bar item or Alt+B. Existing history
   entries re-render in the chosen base; float results are unaffected.
 
+- History re-renders when the notation changes (floats included), not just
+  on display-base changes.
 - The notation setting (sci/eng/eng·si) now applies to integer results too:
   10000000 displays as `1e+7` (SCI), `10e+6` (ENG), or `10M` (ENG·SI).
   AUTO keeps integers exact, and the hex/bin display base takes precedence.
