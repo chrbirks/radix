@@ -84,3 +84,19 @@ def test_session_format_value_honors_int_base() -> None:
     fval = session.evaluate("1/8").value
     assert fval is not None
     assert session.format_value(fval) == "0.125"
+
+
+def test_int_results_follow_notation() -> None:
+    session = Session()
+    value = session.evaluate("10000000").value
+    assert value is not None
+    assert session.format_value(value) == "10000000"  # auto stays exact
+    session.notation = "sci"
+    assert session.format_value(value) == "1e+7"
+    session.notation = "eng"
+    assert session.format_value(value) == "10e+6"
+    session.notation = "eng_si"
+    assert session.format_value(value) == "10M"
+    # The hex/bin display base still takes precedence over notation.
+    session.int_base = "hex"
+    assert session.format_value(value) == "0x98_9680"

@@ -43,12 +43,18 @@ class IntegerViews:
 
 
 def format_number(value: Value, notation: Notation = "auto") -> str:
-    """The primary (decimal) rendering of a result."""
+    """The primary (decimal) rendering of a result.
+
+    Integers follow the selected notation too (sci/eng/eng_si), rendering
+    like reals at display precision; only ``auto`` keeps them exact.
+    """
     n = value.number
-    if isinstance(n, int):
-        return str(n)
     if value.prefer_si and notation == "auto":
-        return format_real(n, "eng_si")
+        notation = "eng_si"
+    if isinstance(n, int):
+        if notation == "auto":
+            return str(n)
+        return format_real(mpmath.mpf(n), notation)
     return format_real(n, notation)
 
 

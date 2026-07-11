@@ -382,7 +382,7 @@ class MainWindow(QMainWindow):
             "word": "word size for bit ops — click or Alt+W",
             "sign": "signedness of >> and SGN row — click or Alt+S",
             "base": "integer result base for history & preview — click or Alt+B",
-            "notation": "float notation — click or Alt+N",
+            "notation": "result notation — click or Alt+N",
         }
         for key, label in self.status_items.items():
             label.setText(texts[key])
