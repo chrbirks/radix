@@ -309,7 +309,8 @@ class MainWindow(QMainWindow):
                 self._recall(+1)
                 return True
             if event.key() == Qt.Key.Key_Escape:
-                self._hide_help()
+                if not self.intview.clear_selection():  # bit-range selection first
+                    self._hide_help()
                 return True
         return super().eventFilter(obj, event)
 

@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
   QSettings.
 
+- Bit grid: drag across cells to select a bit range — a readout shows the
+  field as `[15:8] = 0xBE = 190 (8 bits)`, and "→ input" then inserts the
+  slice expression (`0x…[15:8]`). Esc or a plain click clears the selection.
 - Bit grid: each nibble group shows its hex digit above the cells (muted when
   zero), so the grid reads directly against the HEX row.
 - Bit grid: bits that flipped vs. the previously shown value are outlined

@@ -165,6 +165,49 @@ def test_ascii_row(qtbot, window: MainWindow) -> None:  # type: ignore[no-untype
     assert window.intview.rows["ASC"][1].text() == "....tok1"
 
 
+def test_bit_range_selection_readout_and_to_input(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xABCD")
+    window.intview.grid_widget.set_selection((15, 8))
+    assert window.intview.slice_label.text() == "[15:8] = 0xAB = 171 (8 bits)"
+    window.intview._emit_to_input()
+    assert window.input.text() == "0xABCD[15:8]"
+
+
+def test_bit_range_selection_esc_clears(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xABCD")
+    window.intview.grid_widget.set_selection((7, 4))
+    qtbot.keyClick(window.input, Qt.Key.Key_Escape)
+    assert window.intview.grid_widget.selection is None
+    assert window.intview.slice_label.text() == ""
+
+
+def test_bit_range_drag_selects_without_toggling(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QEvent
+    from PySide6.QtGui import QMouseEvent
+
+    _submit(qtbot, window, "0xFF")
+    grid = window.intview.grid_widget
+    grid.resize(600, 400)
+
+    def mouse(kind: QEvent.Type, bit: int, buttons: Qt.MouseButton) -> QMouseEvent:
+        pos = grid._cell_rect(bit).center()
+        return QMouseEvent(
+            kind, pos, pos, pos,
+            Qt.MouseButton.LeftButton, buttons, Qt.KeyboardModifier.NoModifier,
+        )
+
+    grid.mousePressEvent(mouse(QEvent.Type.MouseButtonPress, 4, Qt.MouseButton.LeftButton))
+    grid.mouseMoveEvent(mouse(QEvent.Type.MouseMove, 1, Qt.MouseButton.LeftButton))
+    grid.mouseReleaseEvent(mouse(QEvent.Type.MouseButtonRelease, 1, Qt.MouseButton.NoButton))
+    assert grid.selection == (4, 1)
+    assert window.intview.scratch == 0xFF  # a drag never toggles bits
+    # A plain click still toggles (and drops the selection).
+    grid.mousePressEvent(mouse(QEvent.Type.MouseButtonPress, 0, Qt.MouseButton.LeftButton))
+    grid.mouseReleaseEvent(mouse(QEvent.Type.MouseButtonRelease, 0, Qt.MouseButton.NoButton))
+    assert grid.selection is None
+    assert window.intview.scratch == 0xFE
+
+
 def test_bin_row_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 

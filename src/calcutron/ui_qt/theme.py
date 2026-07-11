@@ -156,6 +156,11 @@ def stylesheet(p: Palette, mono: str) -> str:
         font-size: 15px;
         padding: 1px 6px;
     }}
+    QLabel.sliceNote {{
+        color: {p.accent};
+        font-size: 15px;
+        padding: 1px 6px;
+    }}
     QStatusBar {{
         background: {p.background};
         color: {p.muted};

@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from calcutron.engine.formatter import integer_views
+from calcutron.engine.formatter import format_int_base, integer_views
 from calcutron.ui_qt.theme import Palette
 
 CELL = 24
@@ -43,6 +43,7 @@ class BitGrid(QWidget):
     """
 
     bit_toggled = Signal(int)  # bit index
+    selection_changed = Signal()  # read .selection for the current (hi, lo)
 
     def __init__(self, palette: Palette) -> None:
         super().__init__()
@@ -51,7 +52,10 @@ class BitGrid(QWidget):
         self.value = 0
         self.changed = 0  # bits that flipped vs. the previous value (outlined)
         self.enabled_look = True
+        self.selection: tuple[int, int] | None = None  # (hi, lo) drag-selected range
         self._hover_bit: int | None = None
+        self._press_bit: int | None = None
+        self._dragging = False
         self.setMouseTracking(True)
         self._apply_height()
 
@@ -109,6 +113,16 @@ class BitGrid(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(on if set_ else off)
             painter.drawRoundedRect(rect, 2, 2)
+        # Drag-selected range: translucent accent band + text-color outline
+        # (visible over both set and unset cells).
+        if self.enabled_look and self.selection is not None:
+            hi, lo = self.selection
+            band = QColor(p.accent)
+            band.setAlphaF(0.25)
+            painter.setBrush(band)
+            painter.setPen(QPen(QColor(p.text), 1.5))
+            for bit in range(lo, min(hi, self.word_size - 1) + 1):
+                painter.drawRoundedRect(self._cell_rect(bit).adjusted(-1, -1, 1, 1), 3, 3)
         # Outline the bits that flipped vs. the previous value.
         if self.enabled_look and self.changed:
             painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -152,15 +166,33 @@ class BitGrid(QWidget):
                 return bit
         return None
 
+    def set_selection(self, selection: tuple[int, int] | None) -> None:
+        if selection == self.selection:
+            return
+        self.selection = selection
+        self.selection_changed.emit()
+        self.update()
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if not self.enabled_look:
             return
-        bit = self._bit_at(event.position())
-        if bit is not None:
-            self.bit_toggled.emit(bit)
+        self._press_bit = self._bit_at(event.position())
+        self._dragging = False
+        if self._press_bit is None:
+            self.set_selection(None)  # click outside the cells clears the range
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         bit = self._bit_at(event.position())
+        # Drag with the left button held: extend the (hi, lo) selection.
+        if (
+            self.enabled_look
+            and self._press_bit is not None
+            and event.buttons() & Qt.MouseButton.LeftButton
+        ):
+            if bit is not None and bit != self._press_bit:
+                self._dragging = True
+            if self._dragging and bit is not None:
+                self.set_selection((max(bit, self._press_bit), min(bit, self._press_bit)))
         if bit == self._hover_bit:
             return
         self._hover_bit = bit
@@ -171,6 +203,13 @@ class BitGrid(QWidget):
         self.setToolTip(
             f"bit {bit} = {state}    2^{bit} = {1 << bit}    byte {bit // 8}, nibble {bit // 4}"
         )
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self.enabled_look and self._press_bit is not None and not self._dragging:
+            self.set_selection(None)  # a plain click both toggles and deselects
+            self.bit_toggled.emit(self._press_bit)
+        self._press_bit = None
+        self._dragging = False
 
 
 class IntegerView(QWidget):
@@ -214,6 +253,7 @@ class IntegerView(QWidget):
 
         self.grid_widget = BitGrid(palette)
         self.grid_widget.bit_toggled.connect(self.toggle_bit)
+        self.grid_widget.selection_changed.connect(self._update_slice_label)
 
         actions = QHBoxLayout()
         actions.setContentsMargins(12, 0, 12, 8)
@@ -227,6 +267,10 @@ class IntegerView(QWidget):
         self.delta_label.setToolTip("set bits gained/lost vs. the previous value")
         actions.addWidget(self.delta_label)
         actions.addStretch(1)
+        self.slice_label = QLabel("")
+        self.slice_label.setProperty("class", "sliceNote")
+        self.slice_label.setToolTip("drag across bit cells to read a field; Esc clears")
+        actions.addWidget(self.slice_label)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -240,6 +284,10 @@ class IntegerView(QWidget):
     def show_value(self, value: int | None, word_size: int, signed: bool) -> None:
         # scratch is kept unmasked: cycling the word size must only change how
         # the value is *displayed*, never destroy its upper bits.
+        # A range selection only survives a same-value re-render (settings
+        # cycling aside, positions and the readout would go stale).
+        if word_size != self.word_size or value is None or value != self.scratch:
+            self.grid_widget.set_selection(None)
         self.word_size = word_size
         self.signed = signed
         was_active = self.active
@@ -253,10 +301,17 @@ class IntegerView(QWidget):
         self._refresh()
 
     def toggle_bit(self, bit: int) -> None:
+        self.grid_widget.set_selection(None)  # a bit edit invalidates the range readout
         self.scratch ^= 1 << bit
         self.changed = 1 << bit
         self._refresh()
         self._emit_to_input()  # the input line always reflects the edited value
+
+    def clear_selection(self) -> bool:
+        """Clear the drag-selected bit range; True if there was one (for Esc)."""
+        had = self.grid_widget.selection is not None
+        self.grid_widget.set_selection(None)
+        return had
 
     @property
     def _masked_scratch(self) -> int:
@@ -297,6 +352,25 @@ class IntegerView(QWidget):
         else:
             self.delta_label.setText("")
         self.grid_widget.set_state(self._masked_scratch, self.word_size, self.active, changed)
+        self._update_slice_label()
+
+    def _selected_slice(self) -> tuple[int, int, int, int] | None:
+        """(hi, lo, value, width) of the drag-selected field, if any."""
+        if self.grid_widget.selection is None:
+            return None
+        hi, lo = self.grid_widget.selection
+        width = hi - lo + 1
+        value = (self._masked_scratch >> lo) & ((1 << width) - 1)
+        return hi, lo, value, width
+
+    def _update_slice_label(self) -> None:
+        sliced = self._selected_slice()
+        if sliced is None or not self.active:
+            self.slice_label.setText("")
+            return
+        hi, lo, value, width = sliced
+        hex_text = format_int_base(value, "hex", width)
+        self.slice_label.setText(f"[{hi}:{lo}] = {hex_text} = {value} ({width} bits)")
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
@@ -312,5 +386,11 @@ class IntegerView(QWidget):
         self.copied.emit(f"{base} copied")
 
     def _emit_to_input(self) -> None:
-        if self.active:
+        if not self.active:
+            return
+        sliced = self._selected_slice()
+        if sliced is not None:
+            hi, lo, _, _ = sliced
+            self.value_to_input.emit(f"0x{self._masked_scratch:X}[{hi}:{lo}]")
+        else:
             self.value_to_input.emit(f"0x{self._masked_scratch:X}")
