@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QResizeEvent
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen, QResizeEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -28,8 +28,9 @@ from calcutron.ui_qt.theme import Palette
 CELL = 24
 GAP = 4
 NIBBLE_GAP = 10
+HEX_H = 18  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
-ROW_H = CELL + GAP + INDEX_H
+ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
 
 
@@ -48,13 +49,17 @@ class BitGrid(QWidget):
         self.palette_tokens = palette
         self.word_size = 64
         self.value = 0
+        self.changed = 0  # bits that flipped vs. the previous value (outlined)
         self.enabled_look = True
+        self._hover_bit: int | None = None
+        self.setMouseTracking(True)
         self._apply_height()
 
-    def set_state(self, value: int, word_size: int, enabled: bool) -> None:
+    def set_state(self, value: int, word_size: int, enabled: bool, changed: int = 0) -> None:
         self.value = value
         self.word_size = word_size
         self.enabled_look = enabled
+        self.changed = changed
         self._apply_height()
         self.update()
 
@@ -85,7 +90,7 @@ class BitGrid(QWidget):
         row, col = divmod(pos, per_row)
         nibble_gaps = col // 4
         x = 4 + col * (CELL + GAP) + nibble_gaps * NIBBLE_GAP
-        y = 4 + row * ROW_H
+        y = 4 + row * ROW_H + HEX_H
         return QRectF(x, y, CELL, CELL)
 
     def sizeHint(self) -> QSize:
@@ -104,10 +109,35 @@ class BitGrid(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(on if set_ else off)
             painter.drawRoundedRect(rect, 2, 2)
-        # Bit-index labels under each nibble's MSB cell (63, 59, … 3), plus bit 0.
+        # Outline the bits that flipped vs. the previous value.
+        if self.enabled_look and self.changed:
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(self.palette_tokens.bit_changed), 2))
+            for bit in range(self.word_size):
+                if (self.changed >> bit) & 1:
+                    painter.drawRoundedRect(self._cell_rect(bit).adjusted(1, 1, -1, -1), 2, 2)
         label_font = painter.font()
         label_font.setPixelSize(14)
         painter.setFont(label_font)
+        # Per-nibble hex digit above each 4-cell group (muted when zero).
+        for nibble in range(self.word_size // 4):
+            digit = (self.value >> (4 * nibble)) & 0xF
+            msb_cell = self._cell_rect(4 * nibble + 3)
+            lsb_cell = self._cell_rect(4 * nibble)
+            hex_rect = QRectF(
+                msb_cell.left(),
+                msb_cell.top() - HEX_H,
+                lsb_cell.right() - msb_cell.left(),
+                HEX_H - 2,
+            )
+            strong = self.enabled_look and digit != 0
+            painter.setPen(QColor(p.text if strong else p.muted))
+            painter.drawText(
+                hex_rect,
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom,
+                f"{digit:X}",
+            )
+        # Bit-index labels under each nibble's MSB cell (63, 59, … 3), plus bit 0.
         painter.setPen(QColor(self.palette_tokens.muted))
         for bit in range(self.word_size):
             if bit % 4 == 3 or bit == 0:
@@ -116,14 +146,31 @@ class BitGrid(QWidget):
                 painter.drawText(label_rect, Qt.AlignmentFlag.AlignHCenter, str(bit))
         painter.end()
 
+    def _bit_at(self, pos: QPointF) -> int | None:
+        for bit in range(self.word_size):
+            if self._cell_rect(bit).contains(pos):
+                return bit
+        return None
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if not self.enabled_look:
             return
-        pos = event.position()
-        for bit in range(self.word_size):
-            if self._cell_rect(bit).contains(pos):
-                self.bit_toggled.emit(bit)
-                return
+        bit = self._bit_at(event.position())
+        if bit is not None:
+            self.bit_toggled.emit(bit)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        bit = self._bit_at(event.position())
+        if bit == self._hover_bit:
+            return
+        self._hover_bit = bit
+        if bit is None or not self.enabled_look:
+            self.setToolTip("")
+            return
+        state = (self.value >> bit) & 1
+        self.setToolTip(
+            f"bit {bit} = {state}    2^{bit} = {1 << bit}    byte {bit // 8}, nibble {bit // 4}"
+        )
 
 
 class IntegerView(QWidget):
@@ -138,6 +185,7 @@ class IntegerView(QWidget):
         self.palette_tokens = palette
         self._clipboard = clipboard_setter
         self.scratch = 0
+        self.changed = 0  # bits that flipped vs. the previously shown value
         self.word_size = 64
         self.signed = False
         self.active = False
@@ -148,7 +196,7 @@ class IntegerView(QWidget):
         grid.setContentsMargins(12, 8, 12, 4)
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(2)
-        for i, base in enumerate(("HEX", "DEC", "SGN", "BIN")):
+        for i, base in enumerate(("HEX", "DEC", "SGN", "BIN", "ASC")):
             name = QLabel(base)
             name.setProperty("class", "baseName")
             value = QLabel("—")
@@ -174,6 +222,10 @@ class IntegerView(QWidget):
         to_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         to_input.clicked.connect(self._emit_to_input)
         actions.addWidget(to_input)
+        self.delta_label = QLabel("")
+        self.delta_label.setProperty("class", "deltaNote")
+        self.delta_label.setToolTip("set bits gained/lost vs. the previous value")
+        actions.addWidget(self.delta_label)
         actions.addStretch(1)
 
         layout = QVBoxLayout(self)
@@ -190,13 +242,19 @@ class IntegerView(QWidget):
         # the value is *displayed*, never destroy its upper bits.
         self.word_size = word_size
         self.signed = signed
+        was_active = self.active
         self.active = value is not None
         if value is not None:
+            if not was_active:
+                self.changed = 0  # first value after a grey spell: no diff to show
+            elif value != self.scratch:
+                self.changed = value ^ self.scratch
             self.scratch = value
         self._refresh()
 
     def toggle_bit(self, bit: int) -> None:
         self.scratch ^= 1 << bit
+        self.changed = 1 << bit
         self._refresh()
         self._emit_to_input()  # the input line always reflects the edited value
 
@@ -211,6 +269,7 @@ class IntegerView(QWidget):
             "DEC": views.dec_unsigned,
             "SGN": views.dec_signed,
             "BIN": views.binary,
+            "ASC": views.ascii,
         }
         self._copy_texts = texts
         for base, (name, value_label) in self.rows.items():
@@ -229,7 +288,15 @@ class IntegerView(QWidget):
                 w.setProperty("dimmed", "false" if self.active else "true")
                 w.style().unpolish(w)
                 w.style().polish(w)
-        self.grid_widget.set_state(self._masked_scratch, self.word_size, self.active)
+        mask = (1 << self.word_size) - 1
+        changed = self.changed & mask if self.active else 0
+        if changed:
+            gained = (self._masked_scratch & changed).bit_count()
+            lost = (~self._masked_scratch & changed).bit_count()
+            self.delta_label.setText(f"Δ +{gained} -{lost}")
+        else:
+            self.delta_label.setText("")
+        self.grid_widget.set_state(self._masked_scratch, self.word_size, self.active, changed)
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette

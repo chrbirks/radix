@@ -26,6 +26,7 @@ class Palette:
     error: str
     bit_on: str
     bit_off: str
+    bit_changed: str  # outline on bits that flipped vs. the previous value
     syn_number: str
     syn_function: str
     syn_operator: str
@@ -42,6 +43,7 @@ LIGHT = Palette(
     error="#c92a2a",
     bit_on="#2563eb",
     bit_off="#d5dae1",
+    bit_changed="#d97706",
     syn_number="#0550ae",
     syn_function="#6f42c1",
     syn_operator="#b35900",
@@ -58,6 +60,7 @@ DARK = Palette(
     error="#ff6b6b",
     bit_on="#5b8def",
     bit_off="#3a4048",
+    bit_changed="#e8a33d",
     syn_number="#79c0ff",
     syn_function="#d2a8ff",
     syn_operator="#e0af68",
@@ -147,6 +150,11 @@ def stylesheet(p: Palette, mono: str) -> str:
     QPushButton.copyBtn:hover {{
         color: {p.accent};
         border-color: {p.accent};
+    }}
+    QLabel.deltaNote {{
+        color: {p.muted};
+        font-size: 15px;
+        padding: 1px 6px;
     }}
     QStatusBar {{
         background: {p.background};

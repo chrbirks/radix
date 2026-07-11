@@ -39,6 +39,7 @@ class IntegerViews:
     dec_unsigned: str
     dec_signed: str
     binary: str
+    ascii: str  # one char per byte, MSB first; "." for non-printable bytes
     fits_word: bool  # False if the true value needed more bits than the word
 
 
@@ -101,6 +102,10 @@ def integer_views(value: int, word_size: int) -> IntegerViews:
         dec_unsigned=str(wrapped),
         dec_signed=str(signed_value),
         binary=_group(f"{wrapped:b}", 4, min_width=word_size, prefix="0b"),
+        ascii="".join(
+            chr(b) if 32 <= b < 127 else "."
+            for b in wrapped.to_bytes(word_size // 8, "big")
+        ),
         fits_word=fits,
     )
 

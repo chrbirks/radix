@@ -32,6 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
   QSettings.
 
+- Bit grid: each nibble group shows its hex digit above the cells (muted when
+  zero), so the grid reads directly against the HEX row.
+- Bit grid: bits that flipped vs. the previously shown value are outlined
+  (amber) with a `Δ +n -m` gained/lost note — makes the effect of masks,
+  shifts, and rotates visible at a glance.
+- Bit grid: hovering a cell shows the bit index, its weight (2^n), and its
+  byte/nibble position.
+- New ASC row in the integer panel: the value's bytes as ASCII (dots for
+  non-printable), with its own copy button — quick decode of magic numbers
+  and packed strings.
+
 ### Fixed
 
 - Errors now underline the offending span directly in the input field (red

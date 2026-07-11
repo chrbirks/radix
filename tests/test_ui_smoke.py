@@ -144,6 +144,27 @@ def test_bit_toggle_writes_input(qtbot, window: MainWindow) -> None:  # type: ig
     assert window.intview.scratch == 0x19
 
 
+def test_changed_bits_diff_against_previous_value(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    assert window.intview.changed == 0  # first value after grey: nothing to diff
+    window.input.setText("ans << 1")
+    window._update_preview()
+    assert window.intview.changed == 0xFF ^ 0x1FE  # bits 0 and 8 flipped
+    assert window.intview.delta_label.text() == "Δ +1 -1"
+
+
+def test_bit_toggle_marks_single_changed_bit(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "8")
+    window.intview.toggle_bit(0)
+    assert window.intview.changed == 1
+    assert window.intview.delta_label.text() == "Δ +1 -0"
+
+
+def test_ascii_row(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0x746F6B31")
+    assert window.intview.rows["ASC"][1].text() == "....tok1"
+
+
 def test_bin_row_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 

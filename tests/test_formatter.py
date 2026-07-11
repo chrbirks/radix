@@ -46,6 +46,12 @@ def test_integer_views_grouping_and_signedness() -> None:
     assert views.dec_signed == "-1"
 
 
+def test_integer_views_ascii() -> None:
+    assert integer_views(0x746F6B31, 32).ascii == "tok1"
+    assert integer_views(1020, 16).ascii == ".."  # 0x03 0xFC: non-printable
+    assert integer_views(0x41, 8).ascii == "A"
+
+
 def test_preview_rendering() -> None:
     session = Session()
     assert session.preview("2^10").normalized == "2 XOR 10"
