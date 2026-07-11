@@ -169,17 +169,11 @@ class IntegerView(QWidget):
 
         actions = QHBoxLayout()
         actions.setContentsMargins(12, 0, 12, 8)
-        for label, fn in (
-            ("→ input", self._emit_to_input),
-            ("copy Verilog", lambda: self.copy_hdl("verilog")),
-            ("copy VHDL", lambda: self.copy_hdl("vhdl")),
-            ("copy C", lambda: self.copy_hdl("c")),
-        ):
-            btn = QPushButton(label)
-            btn.setProperty("class", "copyBtn")
-            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            btn.clicked.connect(fn)
-            actions.addWidget(btn)
+        to_input = QPushButton("→ input")
+        to_input.setProperty("class", "copyBtn")
+        to_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        to_input.clicked.connect(self._emit_to_input)
+        actions.addWidget(to_input)
         actions.addStretch(1)
 
         layout = QVBoxLayout(self)
@@ -249,20 +243,6 @@ class IntegerView(QWidget):
             return
         self._clipboard(self._copy_texts[base])  # plain text, never the rich-text markup
         self.copied.emit(f"{base} copied")
-
-    def copy_hdl(self, flavor: str) -> None:
-        if not self.active:
-            return
-        width = self.word_size
-        hex_digits = f"{self._masked_scratch:0{width // 4}X}"
-        if flavor == "verilog":
-            text = f"{width}'h{hex_digits}"
-        elif flavor == "vhdl":
-            text = f'x"{hex_digits}"'
-        else:
-            text = f"0x{hex_digits}"
-        self._clipboard(text)
-        self.copied.emit(f"{flavor} literal copied: {text}")
 
     def _emit_to_input(self) -> None:
         if self.active:

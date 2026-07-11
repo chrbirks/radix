@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Window size was saved on close but never actually restored (the startup
   default overrode it).
 
+### Removed
+
+- The "copy Verilog" / "copy VHDL" / "copy C" buttons in the integer panel.
+
 ### Changed
 
 - Larger bit-grid cells (24 px) for readability.
