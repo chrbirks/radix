@@ -5,6 +5,14 @@ All notable changes to Calcutron-9000 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Larger bit-grid cells (24 px) for readability.
+- Clicking a bit in the grid now writes the edited value straight into the
+  input field as a hex literal (previously only via the "→ input" button).
+
 ## [1.0.0] - 2026-07-11
 
 First release.
