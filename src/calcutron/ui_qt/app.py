@@ -30,6 +30,5 @@ def run_gui(session: Session) -> int:
     window = MainWindow(session, theme.current_palette(app), store=HistoryStore())
     app.styleHints().colorSchemeChanged.connect(lambda _scheme: apply_theme())
     apply_theme()
-    window.resize(600, 800)
     window.show()
     return app.exec()

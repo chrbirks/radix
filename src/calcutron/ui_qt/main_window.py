@@ -8,7 +8,7 @@ Session — the UI never computes anything itself.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QAction, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -29,6 +29,7 @@ from calcutron.ui_qt.bit_panel import IntegerView
 from calcutron.ui_qt.highlight import ExprHighlighter
 from calcutron.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
 from calcutron.ui_qt.input_edit import InputEdit
+from calcutron.ui_qt.settings import app_settings, load_session, save_session
 from calcutron.ui_qt.theme import Palette
 
 PREVIEW_DEBOUNCE_MS = 100
@@ -112,13 +113,19 @@ class MainWindow(QMainWindow):
         self.toast_timer.setInterval(1800)
         self.toast_timer.timeout.connect(lambda: self.toast_label.setText(""))
 
+        self.resize(600, 800)  # default size; replaced by restored geometry below
         if self.store is not None:
+            load_session(self.session)
+            self._refresh_status()
             for old in self.store.load():
                 self.model.append(HistoryEntry(old.expression, old.result, old.note))
             self.history_view.scrollToBottom()
-            geometry = QSettings("calcutron", "calcutron").value("geometry")
+            s = app_settings()
+            geometry = s.value("geometry")
             if geometry is not None:
                 self.restoreGeometry(geometry)
+            if s.value("always_on_top", False, type=bool):
+                self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
 
         self.intview.show_value(None, session.word_size, session.signed)
         self.input.setFocus()
@@ -344,6 +351,8 @@ class MainWindow(QMainWindow):
     def _after_setting_change(self) -> None:
         self._refresh_status()
         self._reformat_history()
+        if self.store is not None:
+            save_session(self.session)
         # Re-render the current panel value under the new settings; never re-evaluate.
         self.intview.show_value(
             self.intview.scratch if self.intview.active else None,
@@ -403,11 +412,14 @@ class MainWindow(QMainWindow):
         on_top = not bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on_top)
         self.show()
+        if self.store is not None:
+            app_settings().setValue("always_on_top", on_top)
         self._toast("always on top" if on_top else "normal stacking")
 
     def closeEvent(self, event: object) -> None:
         if self.store is not None:
-            QSettings("calcutron", "calcutron").setValue("geometry", self.saveGeometry())
+            save_session(self.session)
+            app_settings().setValue("geometry", self.saveGeometry())
         super().closeEvent(event)  # type: ignore[arg-type]
 
     def _toast(self, message: str) -> None:

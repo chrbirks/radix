@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live preview — cycle via the status-bar item or Alt+B. Existing history
   entries re-render in the chosen base; float results are unaffected.
 
+- Settings now persist across restarts: word size, signedness, deg/rad,
+  notation, result base, always-on-top, and window size/position. Stored as
+  a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
+  QSettings.
+
+### Fixed
+
+- Window size was saved on close but never actually restored (the startup
+  default overrode it).
+
 ### Changed
 
 - Larger bit-grid cells (24 px) for readability.

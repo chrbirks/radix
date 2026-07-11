@@ -171,6 +171,41 @@ def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: i
     assert window.intview.rows["HEX"][1].text().endswith("00FF")  # falls back to ans
 
 
+def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from calcutron.history.store import HistoryStore
+
+    # Redirect the INI file into the sandbox so the test never touches the
+    # user's real settings.
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+
+    win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win1)
+    win1._cycle_word_size()  # 64 -> 8
+    win1._toggle_signed()
+    win1._toggle_angle()
+    win1._cycle_notation()  # auto -> sci
+    win1._cycle_int_base()  # dec -> hex
+    win1.resize(640, 700)  # fits the offscreen virtual screen (restore clamps)
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win2)
+    assert win2.session.word_size == 8
+    assert win2.session.signed is True
+    assert win2.session.angle_deg is True
+    assert win2.session.notation == "sci"
+    assert win2.session.int_base == "hex"
+    assert win2.status_items["base"].text() == "HEX"
+    assert (win2.width(), win2.height()) == (640, 700)
+
+    win3 = MainWindow(Session(), LIGHT)  # store=None: defaults, settings untouched
+    qtbot.addWidget(win3)
+    assert win3.session.word_size == 64
+    assert win3.session.int_base == "dec"
+
+
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from calcutron.ui_qt.bit_panel import BYTE_WIDTH
 
