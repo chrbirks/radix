@@ -12,7 +12,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent
 from PySide6.QtWidgets import QWidget
 
-from calcutron.engine.viz import FixedPointViz, VizPayload
+from calcutron.engine.viz import ClockViz, FixedPointViz, VizPayload
 from calcutron.ui_qt.theme import Palette
 
 VIZ_CELL = 18
@@ -23,6 +23,9 @@ LINE_H = 24
 BAR_H = VIZ_CELL + 4
 METER_W = 140
 METER_H = 8
+# clkdiv error color thresholds (a UART is unhappy past ~2-3%).
+CLK_ERR_WARN_PPM = 10_000  # 1%
+CLK_ERR_BAD_PPM = 30_000  # 3%
 
 
 class VizPanel(QWidget):
@@ -40,8 +43,11 @@ class VizPanel(QWidget):
 
     def show_payload(self, payload: VizPayload | None) -> None:
         self.payload = payload
-        if payload is not None:
+        if isinstance(payload, FixedPointViz):
             self.setFixedHeight(8 + LINE_H + BAR_H + LINE_H + 10)
+        elif isinstance(payload, ClockViz):
+            lines = 2 if payload.divisor is not None else 1
+            self.setFixedHeight(8 + lines * LINE_H + 10)
         self.setVisible(payload is not None)
         self.update()
 
@@ -53,7 +59,42 @@ class VizPanel(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         if isinstance(self.payload, FixedPointViz):
             self._paint_fixed(painter, self.payload)
+        elif isinstance(self.payload, ClockViz):
+            self._paint_clock(painter, self.payload)
         painter.end()
+
+    # -- clock / divider ---------------------------------------------------------
+
+    def _paint_clock(self, painter: QPainter, viz: ClockViz) -> None:
+        p = self.palette_tokens
+        font = painter.font()
+        font.setPixelSize(15)
+        painter.setFont(font)
+        painter.setPen(QColor(p.text))
+        line = f"freq {viz.freq_text}Hz    period {viz.period_text}s"
+        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+                         Qt.AlignmentFlag.AlignVCenter, line)
+        if viz.divisor is None:
+            return
+        y = 8 + LINE_H
+        left = f"/ {viz.divisor}  ->  {viz.achieved_text}Hz  (target {viz.target_text}Hz)   "
+        painter.drawText(QRectF(MARGIN, y, self.width() - 2 * MARGIN, LINE_H),
+                         Qt.AlignmentFlag.AlignVCenter, left)
+        # Error, color-coded against UART-style tolerance.
+        ppm = abs(viz.error_ppm or 0.0)
+        if ppm >= CLK_ERR_BAD_PPM:
+            color = p.error
+        elif ppm >= CLK_ERR_WARN_PPM:
+            color = p.bit_changed
+        else:
+            color = p.float_exp
+        painter.setPen(QColor(color))
+        # QFontMetrics on painter fonts is safe here: the strings are ASCII.
+        offset = painter.fontMetrics().horizontalAdvance(left)
+        painter.drawText(QRectF(MARGIN + offset, y, self.width() - 2 * MARGIN - offset, LINE_H),
+                         Qt.AlignmentFlag.AlignVCenter, f"err {viz.error_text}")
+
+    # -- fixed-point Qm.n -------------------------------------------------------
 
     # -- fixed-point Qm.n -------------------------------------------------------
 

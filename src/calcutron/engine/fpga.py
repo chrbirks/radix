@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import mpmath
 
+from calcutron.engine.formatter import format_si
 from calcutron.engine.functions import (
     EvalContext,
     FunctionDomainError,
@@ -17,7 +18,7 @@ from calcutron.engine.functions import (
     _register,
 )
 from calcutron.engine.values import Number, Value
-from calcutron.engine.viz import FixedPointViz
+from calcutron.engine.viz import ClockViz, FixedPointViz
 
 MAX_MASK_BITS = 1_000_000
 
@@ -138,11 +139,39 @@ def _reciprocal(args: list[Number], what: str) -> mpmath.mpf:
 
 
 def _period(args: list[Number], ctx: EvalContext) -> Value:
-    return Value(_reciprocal(args, "period"), prefer_si=True)
+    t = _reciprocal(args, "period")
+    viz = ClockViz(freq_text=format_si(mpmath.mpf(args[0])), period_text=format_si(t))
+    return Value(t, prefer_si=True, viz=viz)
 
 
 def _freq(args: list[Number], ctx: EvalContext) -> Value:
-    return Value(_reciprocal(args, "freq"), prefer_si=True)
+    f = _reciprocal(args, "freq")
+    viz = ClockViz(freq_text=format_si(f), period_text=format_si(mpmath.mpf(args[0])))
+    return Value(f, prefer_si=True, viz=viz)
+
+
+def _clkdiv(args: list[Number], ctx: EvalContext) -> Value:
+    """Nearest integer divider from a reference clock to a target rate."""
+    f_clk = mpmath.mpf(args[0])
+    f_target = mpmath.mpf(args[1])
+    if f_clk <= 0 or f_target <= 0:
+        raise FunctionDomainError("clkdiv: frequencies must be positive")
+    divisor = max(1, int(mpmath.nint(f_clk / f_target)))
+    achieved = f_clk / divisor
+    ppm = float((achieved - f_target) / f_target * 1_000_000)
+    # Past 1%, percent reads better than ppm.
+    error_text = f"{ppm / 10_000:+.2f}%" if abs(ppm) >= 10_000 else f"{ppm:+.0f} ppm"
+    viz = ClockViz(
+        freq_text=format_si(f_clk),
+        period_text=format_si(1 / f_clk),
+        divisor=divisor,
+        target_text=format_si(f_target),
+        achieved_text=format_si(achieved),
+        error_text=error_text,
+        error_ppm=ppm,
+    )
+    note = f"actual {format_si(achieved)}, error {error_text}"
+    return Value(divisor, note=note, viz=viz)
 
 
 # -- fixed-point Qm.n --------------------------------------------------------------
@@ -237,6 +266,9 @@ _TOOLKIT: list[tuple[str, tuple[int, int], str, str, str, str, Handler]] = [
      "period(100M) = 10n", _period),
     ("freq", (1, 1), "t", _CLOCK, "Frequency from period: 1/t, shown with SI suffix.",
      "freq(8n) = 125M", _freq),
+    ("clkdiv", (2, 2), "f_clk, f_target", _CLOCK,
+     "Nearest integer divider round(f_clk/f_target), with achieved-rate error.",
+     "clkdiv(50M, 115200) = 434", _clkdiv),
     ("fix", (3, 3), "value, m, n", _FIXED,
      "Real -> fixed-point Qm.n raw value (two's complement).",
      "fix(0.7071, 1, 15) = 0x5A82", _fix),

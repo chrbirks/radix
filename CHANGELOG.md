@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
   QSettings.
 
+- New `clkdiv(f_clk, f_target)` toolkit function: nearest integer divider
+  with the achieved rate and signed error (ppm, or % past 1%). The viz panel
+  shows the clock card — reference freq/period, `/ N → achieved (target)`,
+  and the error colored green/amber/red at 1% / 3% (UART tolerance).
+  `period()`/`freq()` show their reciprocal pair on the same card.
 - New visualization panel between the preview and the integer panel, driven
   by structured payloads the engine attaches to results. `fix()`/`unfix()`
   now draw the Qm.n layout: sign/integer/fraction bit bands with the binary

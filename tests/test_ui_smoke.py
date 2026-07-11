@@ -108,6 +108,20 @@ def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWin
     assert window.vizpanel.isVisibleTo(window)
 
 
+def test_viz_panel_clock_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from calcutron.engine.viz import ClockViz
+
+    _submit(qtbot, window, "clkdiv(50M, 115200)")
+    assert window.vizpanel.isVisibleTo(window)
+    payload = window.vizpanel.payload
+    assert isinstance(payload, ClockViz)
+    assert payload.divisor == 434
+    _submit(qtbot, window, "period(100M)")
+    payload = window.vizpanel.payload
+    assert isinstance(payload, ClockViz)
+    assert payload.divisor is None and payload.period_text == "10n"
+
+
 def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "help")
     assert window.help_pane.isVisibleTo(window)
@@ -123,7 +137,7 @@ def test_completer_pops_and_tab_inserts(qtbot, window: MainWindow) -> None:  # t
         window.completer.popup.item(i).data(Qt.ItemDataRole.UserRole + 1).name
         for i in range(window.completer.popup.count())
     ]
-    assert names == ["clog2", "clear"]
+    assert names == ["clog2", "clkdiv", "clear"]
     qtbot.keyClick(window.input, Qt.Key.Key_Tab)
     assert window.input.text() == "clog2("
     assert not window.completer.active
@@ -138,6 +152,7 @@ def test_completer_plain_enter_still_evaluates(qtbot, window: MainWindow) -> Non
 
 def test_completer_enter_inserts_only_after_navigation(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     qtbot.keyClicks(window.input, "cl")
+    qtbot.keyClick(window.input, Qt.Key.Key_Down)  # highlight "clog2"
     qtbot.keyClick(window.input, Qt.Key.Key_Down)  # highlight "clear"
     qtbot.keyClick(window.input, Qt.Key.Key_Return)
     assert window.input.text() == "clear"

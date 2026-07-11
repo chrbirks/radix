@@ -100,6 +100,42 @@ def test_fix_unfix_roundtrip() -> None:
     assert run("unfix(0xC000, 1, 15)") == "-0.5"
 
 
+def test_clkdiv_golden_and_viz() -> None:
+    from calcutron.engine.viz import ClockViz
+
+    assert run("clkdiv(50M, 115200)") == "434"
+    assert run("clkdiv(100M, 25M)") == "4"
+    session = Session()
+    outcome = session.evaluate("clkdiv(50M, 115200)")
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, ClockViz)
+    assert viz.divisor == 434
+    assert viz.achieved_text == "115.207373272k"
+    assert viz.error_ppm is not None and abs(viz.error_ppm - 64) < 1
+    assert viz.error_text == "+64 ppm"
+    assert outcome.value.note is not None and "error" in outcome.value.note
+    with pytest.raises(EvalError, match="positive"):
+        run("clkdiv(50M, 0)")
+
+
+def test_period_freq_attach_clock_viz() -> None:
+    from calcutron.engine.viz import ClockViz
+
+    session = Session()
+    outcome = session.evaluate("period(100M)")
+    assert outcome.value is not None
+    viz = outcome.value.viz
+    assert isinstance(viz, ClockViz)
+    assert (viz.freq_text, viz.period_text) == ("100M", "10n")
+    assert viz.divisor is None
+
+    outcome = session.evaluate("freq(8n)")
+    viz = outcome.value.viz if outcome.value else None
+    assert isinstance(viz, ClockViz)
+    assert (viz.freq_text, viz.period_text) == ("125M", "8n")
+
+
 def test_fix_attaches_viz_payload() -> None:
     from calcutron.engine.viz import FixedPointViz
 
