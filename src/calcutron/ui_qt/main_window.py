@@ -8,13 +8,16 @@ Session — the UI never computes anything itself.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QAction, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QListView,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QMenu,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -44,7 +47,8 @@ SHORTCUT_HELP = """Keyboard shortcuts
   F1 or help   this help         Esc          dismiss help
   Alt+W        cycle word size   Alt+S        toggle signed/unsigned
   Alt+D        toggle deg/rad    Alt+N        cycle notation
-  Alt+B        result base       Alt+T        always on top"""
+  Alt+B        result base       Alt+T        always on top
+  Alt+V        variables pane    del <name>   remove a variable"""
 
 
 class MainWindow(QMainWindow):
@@ -85,6 +89,14 @@ class MainWindow(QMainWindow):
         self.help_pane.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.help_pane.hide()
 
+        self.vars_pane = QListWidget()
+        self.vars_pane.setObjectName("varsPane")
+        self.vars_pane.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.vars_pane.itemClicked.connect(self._insert_var_name)
+        self.vars_pane.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.vars_pane.customContextMenuRequested.connect(self._vars_context_menu)
+        self.vars_pane.hide()
+
         self.input = InputEdit()
         self.input.setObjectName("input")
         self.input.setPlaceholderText("type an expression — help for the basics")
@@ -105,6 +117,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.history_view, stretch=1)
         layout.addWidget(self.help_pane, stretch=1)
+        layout.addWidget(self.vars_pane, stretch=1)
         layout.addWidget(self.input)
         layout.addWidget(self.preview)
         layout.addWidget(self.vizpanel)
@@ -181,6 +194,7 @@ class MainWindow(QMainWindow):
             ("Alt+N", self._cycle_notation),
             ("Alt+B", self._cycle_int_base),
             ("Alt+T", self._toggle_always_on_top),
+            ("Alt+V", self._toggle_vars),
         ):
             action = QAction(self)
             action.setShortcut(QKeySequence(keys))
@@ -204,6 +218,15 @@ class MainWindow(QMainWindow):
             self._show_help(outcome.help_text if outcome.target else None)
             self.input.clear()
             return
+        if outcome.kind == "vars":
+            self._show_vars()
+            self.input.clear()
+            return
+        if outcome.kind == "del":
+            self.input.clear()
+            self._toast(f"deleted {outcome.target}")
+            self._refresh_vars_pane()
+            return
         if outcome.kind == "clear":
             self.model.clear()
             if self.store is not None:
@@ -212,6 +235,7 @@ class MainWindow(QMainWindow):
             self._toast("cleared")
             self.intview.show_value(None, self.session.word_size, self.session.signed)
             self.vizpanel.show_payload(None)
+            self._refresh_vars_pane()
             return
         if outcome.value is None:
             return
@@ -235,6 +259,8 @@ class MainWindow(QMainWindow):
         self.input.clear()
         self.preview.setText(" ")
         self._panel_follow(outcome.value)
+        if outcome.kind == "assign":
+            self._refresh_vars_pane()
 
     def _schedule_preview(self) -> None:
         self.preview_timer.start()
@@ -258,6 +284,12 @@ class MainWindow(QMainWindow):
         self.highlighter.set_error_span(None)
         if outcome.kind == "help":
             self._set_preview("press Enter for help", error=False)
+            return
+        if outcome.kind == "vars":
+            self._set_preview("press Enter to list variables", error=False)
+            return
+        if outcome.kind == "del":
+            self._set_preview(f"press Enter to delete {outcome.target}", error=False)
             return
         if outcome.kind == "clear":
             self._set_preview("press Enter to clear variables and history", error=False)
@@ -375,6 +407,8 @@ class MainWindow(QMainWindow):
     def _after_setting_change(self) -> None:
         self._refresh_status()
         self._reformat_history()
+        if self.vars_pane.isVisibleTo(self):
+            self._refresh_vars_pane()  # values honor the new base/notation
         if self.store is not None:
             save_session(self.session)
         # Re-render the current panel value under the new settings; never re-evaluate.
@@ -417,11 +451,59 @@ class MainWindow(QMainWindow):
         else:
             self.help_pane.setPlainText(text)
         self.history_view.hide()
+        self.vars_pane.hide()
         self.help_pane.show()
 
     def _hide_help(self) -> None:
         self.help_pane.hide()
+        self.vars_pane.hide()
         self.history_view.show()
+
+    # -- variables pane ---------------------------------------------------------
+
+    def _show_vars(self) -> None:
+        self._refresh_vars_pane()
+        self.history_view.hide()
+        self.help_pane.hide()
+        self.vars_pane.show()
+
+    def _toggle_vars(self) -> None:
+        if self.vars_pane.isVisibleTo(self):
+            self._hide_help()
+        else:
+            self._show_vars()
+
+    def _refresh_vars_pane(self) -> None:
+        self.vars_pane.clear()
+        if not self.session.variables:
+            placeholder = QListWidgetItem("no variables — assign with  x = 42")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.vars_pane.addItem(placeholder)
+            return
+        for name, value in self.session.variables.items():
+            item = QListWidgetItem(f"{name} = {self.session.format_value(value)}")
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            item.setToolTip("click to insert; right-click or `del <name>` to remove")
+            self.vars_pane.addItem(item)
+
+    def _insert_var_name(self, item: QListWidgetItem) -> None:
+        name = item.data(Qt.ItemDataRole.UserRole)
+        if name:
+            self.completer.suppress_next()
+            self.input.insertPlainText(name)
+            self.input.setFocus()
+
+    def _vars_context_menu(self, pos: QPoint) -> None:
+        item = self.vars_pane.itemAt(pos)
+        name = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if not name:
+            return
+        menu = QMenu(self)
+        delete = menu.addAction(f"delete {name}")
+        if menu.exec(self.vars_pane.mapToGlobal(pos)) is delete:
+            del self.session.variables[name]
+            self._refresh_vars_pane()
+            self._toast(f"deleted {name}")
 
     def _clear_history_view(self) -> None:
         self.model.clear()

@@ -38,6 +38,8 @@ _IDENT_BEFORE_CURSOR = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _COMMANDS = (
     ("help", "This overview; help <name> for one function or operator."),
     ("clear", "Wipe variables and history."),
+    ("vars", "List defined variables (Alt+V pane)."),
+    ("del", "del <name>: remove one variable."),
 )
 
 

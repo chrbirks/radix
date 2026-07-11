@@ -132,6 +132,44 @@ def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[
     assert payload.addressable == 4096
 
 
+def test_vars_pane_lists_and_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "x = 0xFF")
+    _submit(qtbot, window, "vars")
+    assert window.vars_pane.isVisibleTo(window)
+    assert not window.history_view.isVisibleTo(window)
+    assert window.vars_pane.item(0).text() == "x = 255"
+    window._insert_var_name(window.vars_pane.item(0))
+    assert window.input.text() == "x"
+    qtbot.keyClick(window.input, Qt.Key.Key_Escape)
+    assert not window.vars_pane.isVisibleTo(window)
+    assert window.history_view.isVisibleTo(window)
+
+
+def test_vars_pane_honors_display_base(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "x = 0xFF")
+    window._toggle_vars()  # Alt+V path
+    assert window.vars_pane.isVisibleTo(window)
+    window._cycle_int_base()  # dec -> hex
+    assert window.vars_pane.item(0).text() == "x = 0xFF"
+    window._toggle_vars()
+    assert not window.vars_pane.isVisibleTo(window)
+
+
+def test_del_command(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "x = 1")
+    # Preview must be side-effect free.
+    window.input.setText("del x")
+    window._update_preview()
+    assert "delete x" in window.preview.text()
+    assert "x" in window.session.variables
+    qtbot.keyClick(window.input, Qt.Key.Key_Return)
+    assert "x" not in window.session.variables
+    # Unknown names error with a span.
+    window.input.setText("del nope")
+    window._update_preview()
+    assert window.preview.property("state") == "error"
+
+
 def test_help_command_shows_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "help")
     assert window.help_pane.isVisibleTo(window)

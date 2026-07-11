@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from calcutron.engine import evaluator, render
 from calcutron.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
 from calcutron.engine import help as help_mod
-from calcutron.engine.errors import CalcError, EvalError
+from calcutron.engine.errors import CalcError, EvalError, Span
 from calcutron.engine.formatter import (
     FloatViews,
     IntegerViews,
@@ -31,7 +31,11 @@ WORD_SIZES = (8, 16, 32, 64)
 NOTATIONS = ("auto", "sci", "eng", "eng_si")
 INT_BASES = ("dec", "hex", "bin")
 
-RESERVED_NAMES = frozenset({"ans", "help", "clear"}) | frozenset(CONSTANTS) | frozenset(FUNCTIONS)
+RESERVED_NAMES = (
+    frozenset({"ans", "help", "clear", "vars", "del"})
+    | frozenset(CONSTANTS)
+    | frozenset(FUNCTIONS)
+)
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,19 @@ class Session:
                 self.variables.clear()
                 self.ans = None
             return Outcome("clear")
+        if word == "vars" and not rest:
+            lines = [f"{k} = {self.format_value(v)}" for k, v in self.variables.items()]
+            return Outcome("vars", help_text="\n".join(lines) or "no variables defined")
+        if word == "del":
+            if rest.startswith("="):
+                return None  # `del = ...` is an assignment attempt → reserved-name error
+            if not rest:
+                raise EvalError("del: which variable? e.g. del x", Span(0, len(line)))
+            if rest not in self.variables:
+                raise EvalError(f"no variable named {rest!r}", Span(len(word) + 1, len(line)))
+            if commit:
+                del self.variables[rest]
+            return Outcome("del", target=rest)
         return None
 
     # -- display helpers -------------------------------------------------------

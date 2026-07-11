@@ -26,7 +26,7 @@ def run_expression(session: Session, text: str) -> int:
         print(exc.span.caret_line(), file=sys.stderr)
         print(f"error: {exc.message}", file=sys.stderr)
         return 1
-    if outcome.kind == "help":
+    if outcome.kind in ("help", "vars"):
         print(outcome.help_text)
         return 0
     if outcome.value is None:

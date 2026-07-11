@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Variables inspector: `vars` (or Alt+V) opens a pane listing every defined
+  variable rendered in the current base/notation; click a row to insert the
+  name, right-click to delete. New `del <name>` command removes a variable
+  from the keyboard. Both commands appear in the autocomplete.
 - Autocomplete in the input field: typing an identifier (or Ctrl+Space) pops
   a list of matching functions, constants, variables, and commands with
   signatures and one-line summaries. Tab inserts; Enter inserts only after

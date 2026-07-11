@@ -188,6 +188,20 @@ def stylesheet(p: Palette, mono: str) -> str:
     QLabel.statusItem:hover {{
         color: {p.accent};
     }}
+    QListWidget#varsPane {{
+        background: {p.surface};
+        color: {p.text};
+        border: none;
+        border-bottom: 1px solid {p.hairline};
+        padding: 8px;
+        font-size: 18px;
+    }}
+    QListWidget#varsPane::item {{
+        padding: 4px 6px;
+    }}
+    QListWidget#varsPane::item:hover {{
+        color: {p.accent};
+    }}
     QTextEdit#helpPane {{
         background: {p.surface};
         color: {p.text};
