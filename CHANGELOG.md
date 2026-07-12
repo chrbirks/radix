@@ -2,12 +2,14 @@
 
 All notable changes to Radix (formerly Calcutron-9000) are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Versions are a simple incrementing integer (1, 2, 3, …), not semantic
+versioning — there's one user, no external API to keep compatible, and no
+ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-07-12
+## [2] - 2026-07-12
 
 ### Added
 
@@ -111,7 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking a bit in the grid now writes the edited value straight into the
   input field as a hex literal (previously only via the "→ input" button).
 
-## [1.0.0] - 2026-07-11
+## [1] - 2026-07-11
 
 First release.
 

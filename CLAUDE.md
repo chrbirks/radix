@@ -62,6 +62,7 @@ diagnostics.
   upper bits. The input line always reflects bit-grid edits.
 - Version is single-sourced from `radix.__version__` (hatchling dynamic
   version); it appears in the window title, help header, and `--version`.
+  Versions are a plain incrementing integer (`"1"`, `"2"`, …) — not semver.
 
 ## Conventions & gotchas
 
