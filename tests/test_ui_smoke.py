@@ -543,6 +543,66 @@ def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: i
     assert window.intview.rows["HEX"][1].text().endswith("00FF")  # falls back to ans
 
 
+def test_history_click_inspects_without_touching_input(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")  # row 0
+    _submit(qtbot, window, "0x10")  # row 1, becomes ans
+    window._inspect_from_view(window.model.index(0))
+    assert window.intview.rows["HEX"][1].text().endswith("00FF")  # row 0's value, not ans
+    assert window.input.text() == ""
+    assert window._inspect_locked is True
+
+
+def test_history_inspect_lock_survives_empty_preview(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")  # row 0
+    _submit(qtbot, window, "0x10")  # row 1, becomes ans
+    window._inspect_from_view(window.model.index(0))
+    window.input.setText("")
+    window._update_preview()
+    assert window.intview.rows["HEX"][1].text().endswith("00FF")  # still the inspected entry
+
+
+def test_history_typing_clears_inspect_lock(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")  # row 0
+    _submit(qtbot, window, "0x10")  # row 1, becomes ans
+    window._inspect_from_view(window.model.index(0))
+    window.input.setText("0x1")
+    window._update_preview()
+    assert window._inspect_locked is False
+    window.input.setText("")
+    window._update_preview()
+    assert window.intview.rows["HEX"][1].text().endswith("0010")  # back to ans
+
+
+def test_esc_prefers_bit_selection_then_inspect_lock(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")  # row 0
+    _submit(qtbot, window, "0x10")  # row 1, becomes ans
+    window._inspect_from_view(window.model.index(0))
+    window.intview.grid_widget.set_selection((7, 4))
+    qtbot.keyClick(window.input, Qt.Key.Key_Escape)
+    assert window.intview.grid_widget.selection is None
+    assert window._inspect_locked is True  # first Esc only cleared the bit selection
+    qtbot.keyClick(window.input, Qt.Key.Key_Escape)
+    assert window._inspect_locked is False
+    assert window.intview.rows["HEX"][1].text().endswith("0010")  # falls back to ans
+
+
+def test_history_click_ignores_disk_loaded_entries(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.ui_qt.history_model import HistoryEntry
+
+    window.model.append(HistoryEntry("1 + 1", "2", value=None))
+    before = window.intview.rows["HEX"][1].text()
+    window._inspect_from_view(window.model.index(0))
+    assert window._inspect_locked is False
+    assert window.intview.rows["HEX"][1].text() == before
+
+
+def test_history_click_selects_row(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._inspect_from_view(window.model.index(0))
+    assert window.history_view.currentIndex().row() == 0
+    assert window.history_view.selectionModel().isSelected(window.model.index(0))
+
+
 def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 

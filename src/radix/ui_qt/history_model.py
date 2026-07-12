@@ -20,7 +20,7 @@ from PySide6.QtCore import (
     Qt,
 )
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
-from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
+from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from radix.engine.values import Value
 from radix.ui_qt.highlight import classify, color_for
@@ -36,6 +36,7 @@ ROW_PAD_V = 4
 LINE_GAP = 2
 BADGE_PAD_H = 6
 BADGE_GAP = 8
+SELECT_BAR_W = 2
 
 
 @dataclass(frozen=True)
@@ -131,12 +132,19 @@ class HistoryDelegate(QStyledItemDelegate):
         index: QModelIndex | QPersistentModelIndex,
     ) -> None:
         painter.save()
+        p = self.palette_tokens
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, QColor(p.chip_bg_active))
+            bar_rect = QRect(
+                option.rect.left(), option.rect.top(), SELECT_BAR_W, option.rect.height()
+            )
+            painter.fillRect(bar_rect, QColor(p.accent))
+
         rect = option.rect.adjusted(ROW_PAD_H, ROW_PAD_V, -ROW_PAD_H, -ROW_PAD_V)
         expression = index.data(EXPRESSION_ROLE) or ""
         result = index.data(RESULT_ROLE) or ""
         note = index.data(NOTE_ROLE) or ""
         prefix = index.data(PREFIX_ROLE) or ""
-        p = self.palette_tokens
 
         expr_font = _scaled(option.font, 0.9)
         result_font = _scaled(option.font, 1.1)

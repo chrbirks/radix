@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         self.palette_tokens = palette
         self.store = store  # None = no persistence (tests)
         self.recall_index: int | None = None
+        self._inspect_locked = False
         self._help_overview_shown = False
         self.last_result_text = ""
 
@@ -91,6 +92,7 @@ class MainWindow(QMainWindow):
         self.history_view.setSelectionMode(QListView.SelectionMode.SingleSelection)
         self.history_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.history_view.doubleClicked.connect(self._recall_from_view)
+        self.history_view.clicked.connect(self._inspect_from_view)
         self.history_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.history_view.customContextMenuRequested.connect(self._history_context_menu)
 
@@ -257,6 +259,7 @@ class MainWindow(QMainWindow):
         text = self.input.text()
         if not text.strip():
             return
+        self._clear_inspect_lock(follow_ans=False)
         self._hide_help()
         try:
             outcome = self.session.evaluate(text)
@@ -321,8 +324,10 @@ class MainWindow(QMainWindow):
         if not text.strip():
             self.highlighter.set_error_span(None)
             self._set_preview(" ", error=False)
-            self._panel_follow(self.session.ans)  # back to the last result
+            if not self._inspect_locked:
+                self._panel_follow(self.session.ans)  # back to the last result
             return
+        self._clear_inspect_lock(follow_ans=False)  # typing resumes live-follow
         try:
             outcome = self.session.preview(text)
         except IncompleteError:
@@ -400,7 +405,11 @@ class MainWindow(QMainWindow):
                 self._recall(+1)
                 return True
             if event.key() == Qt.Key.Key_Escape:
-                if not self.intview.clear_selection():  # bit-range selection first
+                if self.intview.clear_selection():  # bit-range selection first
+                    pass
+                elif self._inspect_locked:
+                    self._clear_inspect_lock(follow_ans=True)
+                else:
                     self._hide_help()
                 return True
         return super().eventFilter(obj, event)
@@ -482,8 +491,27 @@ class MainWindow(QMainWindow):
         )
 
     def _recall_from_view(self, index: object) -> None:
+        # Qt fires `clicked` before `doubleClicked` on the same press, so a
+        # recall briefly locks the inspector via `_inspect_from_view` first;
+        # `_set_input` below fires `textChanged` -> `_update_preview`, which
+        # immediately clears the lock again. Harmless, don't "fix" it.
         row = index.row()  # type: ignore[attr-defined]
         self._set_input(self.model.entries[row].expression)
+
+    def _inspect_from_view(self, index: object) -> None:
+        row = index.row()  # type: ignore[attr-defined]
+        entry = self.model.entries[row]
+        if entry.value is None:  # disk-loaded entry: nothing to inspect
+            return
+        self._inspect_locked = True
+        self.history_view.setCurrentIndex(index)  # type: ignore[arg-type]
+        self._panel_follow(entry.value)
+
+    def _clear_inspect_lock(self, follow_ans: bool) -> None:
+        self._inspect_locked = False
+        self.history_view.clearSelection()
+        if follow_ans:
+            self._panel_follow(self.session.ans)
 
     def _set_input(self, text: str) -> None:
         self.completer.suppress_next()
