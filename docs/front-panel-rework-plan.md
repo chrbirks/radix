@@ -1,6 +1,6 @@
 # Radix front-panel rework — zones, channels/REF, live history, watch rack
 
-Status: **in progress** (WP1 done; WP2-WP5 not started). This document is self-contained: an executor (human or
+Status: **in progress** (WP1-WP2 done; WP3-WP5 not started). This document is self-contained: an executor (human or
 LLM) with no prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints
 are law.
 
@@ -78,12 +78,12 @@ construction and relies on callers to call `set_palette()` right after — could
 a required constructor arg instead; `paintEvent` rebuilds its `QFont`/`QFontMetrics` every repaint
 rather than caching (not a real perf concern given how rarely this widget repaints).
 
-## WP2 — History click-to-inspect + inspect lock
+## WP2 — History click-to-inspect + inspect lock ✅ done (commit 17f244f)
 
-- [ ] `MainWindow._inspect_locked: bool` (init ~:74). `history_view.clicked.connect(
+- [x] `MainWindow._inspect_locked: bool` (init ~:74). `history_view.clicked.connect(
       self._inspect_from_view)` next to the doubleClicked hookup (~:93): entry with
       `value is None` (disk-loaded) → no-op; else lock + `_panel_follow(entry.value)`.
-- [ ] Clear paths: `_update_preview` non-empty branch clears the lock (typing resumes
+- [x] Clear paths: `_update_preview` non-empty branch clears the lock (typing resumes
       live-follow); empty branch keeps resetting highlighter/preview but skips
       `_panel_follow(session.ans)` while locked. Esc in `eventFilter` (~:402): priority bit-
       selection > inspect lock (`_clear_inspect_lock(follow_ans=True)`) > hide help. `_evaluate`
@@ -91,14 +91,21 @@ rather than caching (not a real perf concern given how rarely this widget repain
       `_clear_inspect_lock(follow_ans=False)`: reset flag, `history_view.clearSelection()`,
       optional ans-follow. (Qt emits clicked before doubleClicked — brief lock on recall is
       immediately cleared by textChanged; comment it.)
-- [ ] `history_model.py` `HistoryDelegate.paint` (~:127): when `State_Selected`, fill row with
+- [x] `history_model.py` `HistoryDelegate.paint` (~:127): when `State_Selected`, fill row with
       `chip_bg_active` + 2px accent bar at left (`SELECT_BAR_W = 2` constant).
-- [ ] Tests: drive `_inspect_from_view(model.index(row))` directly; assert inspector shows the
+- [x] Tests: drive `_inspect_from_view(model.index(row))` directly; assert inspector shows the
       entry, input untouched, lock set; empty-input preview keeps inspected value while locked
       (contrast `test_panel_follows_input_live` ~:508); typing clears; Esc restores ans and still
       prefers bit-range clearing. Existing Esc/panel tests safe (lock defaults False).
-- [ ] All three gates green + offscreen screenshot inspected.
-- [ ] Committed.
+- [x] All three gates green (212 tests, ruff clean, mypy clean) + offscreen screenshot inspected
+      (selected row shows chip_bg_active fill + accent bar; inspector shows the clicked entry,
+      not `ans`; input left empty/untouched).
+- [x] Committed: `17f244f` "Add history click-to-inspect with lock". Review approved on first
+      pass, no fix round needed.
+
+Deferred Minor polish (not blocking): `main_window.py`'s Qt-quirk comment near
+`_recall_from_view` says the lock is cleared "immediately" by a double-click recall — actually
+~100ms later via the preview debounce timer, not synchronous. Cosmetic wording nit only.
 
 ## WP3 — Channels rack (pin, persist, reformat)
 
