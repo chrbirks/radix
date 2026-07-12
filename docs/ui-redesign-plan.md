@@ -1,6 +1,6 @@
 # Radix UI redesign — "Bench instrument" (execution plan)
 
-Status: **in progress** (WP1-WP5 done). This document is self-contained: an executor (human or LLM) with no
+Status: **in progress** (WP1-WP6 done). This document is self-contained: an executor (human or LLM) with no
 prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints are law;
 the non-negotiable ones are repeated in §3 because violating them causes segfaults or data
 loss, not style nits.
@@ -28,7 +28,7 @@ Progress:
 - [x] WP3 — Inspector lanes redesign
 - [x] WP4 — Register-view bit grid (collapse rail)
 - [x] WP5 — History as ledger
-- [ ] WP6 — Mode chips
+- [x] WP6 — Mode chips
 - [ ] WP7 — Viz cards + timing diagram
 - [ ] WP8 — Input row + help/vars polish
 - [ ] WP9 — Final sweep (screenshot matrix, CHANGELOG)

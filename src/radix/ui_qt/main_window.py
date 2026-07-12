@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -175,7 +176,7 @@ class MainWindow(QMainWindow):
         self.toast_label.setProperty("class", "statusItem")
         bar.addWidget(self.toast_label, 1)
 
-        self.status_items: dict[str, QLabel] = {}
+        self.status_items: dict[str, QToolButton] = {}
         for key, handler in (
             ("angle", self._toggle_angle),
             ("word", self._cycle_word_size),
@@ -183,16 +184,22 @@ class MainWindow(QMainWindow):
             ("base", self._cycle_int_base),
             ("notation", self._cycle_notation),
         ):
-            label = _ClickableLabel(handler)
-            label.setProperty("class", "statusItem")
-            label.setCursor(Qt.CursorShape.PointingHandCursor)
-            bar.addPermanentWidget(label)
-            self.status_items[key] = label
-        help_hint = _ClickableLabel(self._show_help)
+            chip = QToolButton()
+            chip.setProperty("class", "modeChip")
+            chip.setAutoRaise(True)
+            chip.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # chips never steal focus
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            chip.clicked.connect(handler)
+            bar.addPermanentWidget(chip)
+            self.status_items[key] = chip
+        help_hint = QToolButton()
         help_hint.setText("?")
-        help_hint.setProperty("class", "statusItem")
+        help_hint.setProperty("class", "modeChip")
+        help_hint.setAutoRaise(True)
+        help_hint.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         help_hint.setCursor(Qt.CursorShape.PointingHandCursor)
         help_hint.setToolTip("help  (F1)")
+        help_hint.clicked.connect(lambda _=False: self._show_help())
         bar.addPermanentWidget(help_hint)
         self._refresh_status()
 
@@ -653,12 +660,3 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_wide"):
             self._apply_layout(self.width() >= WIDE_BREAKPOINT)
         super().resizeEvent(event)  # type: ignore[arg-type]
-
-
-class _ClickableLabel(QLabel):
-    def __init__(self, handler: object) -> None:
-        super().__init__()
-        self._handler = handler
-
-    def mousePressEvent(self, event: object) -> None:
-        self._handler()  # type: ignore[operator]
