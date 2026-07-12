@@ -1,7 +1,9 @@
-"""The single-window, stacked single-column UI.
+"""The adaptive single-window UI.
 
-Layout (top to bottom): history (stretches) / input + live preview / integer
-view / status bar. Keyboard-first: the input line is always focused; Up/Down
+Narrow (< WIDE_BREAKPOINT): history/help/vars pane (stretches) / input bar /
+inspector, stacked in one column. Wide: a splitter puts the pane stack and
+the inspector side by side, with the input bar spanning the full width
+underneath. Keyboard-first: the input line is always focused; Up/Down
 recall history; `help` and `clear` are typed commands. All math goes through
 Session — the UI never computes anything itself.
 """
@@ -20,6 +22,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QMenu,
+    QSplitter,
+    QStackedWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -31,16 +35,16 @@ from radix.engine.help import general_help_html
 from radix.engine.values import Value
 from radix.history.store import HistoryStore, StoredEntry
 from radix.session import Session
-from radix.ui_qt.bit_panel import IntegerView
 from radix.ui_qt.completer import Completer
 from radix.ui_qt.highlight import ExprHighlighter
 from radix.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
-from radix.ui_qt.input_edit import InputEdit
+from radix.ui_qt.input_edit import InputBar
+from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
 from radix.ui_qt.theme import Palette
-from radix.ui_qt.viz_panel import VizPanel
 
 PREVIEW_DEBOUNCE_MS = 100
+WIDE_BREAKPOINT = 900  # splitter (pane stack | inspector) above this width
 
 SHORTCUT_HELP = """Keyboard shortcuts
   Enter        evaluate          Up / Down    recall history
@@ -54,6 +58,8 @@ SHORTCUT_HELP = """Keyboard shortcuts
 
 
 class MainWindow(QMainWindow):
+    _wide: bool  # set by _apply_layout; absent until the first call
+
     def __init__(
         self, session: Session, palette: Palette, store: HistoryStore | None = None
     ) -> None:
@@ -69,9 +75,9 @@ class MainWindow(QMainWindow):
 
         root = QWidget()
         root.setObjectName("root")
-        layout = QVBoxLayout(root)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        self.root_layout = QVBoxLayout(root)
+        self.root_layout.setContentsMargins(0, 0, 0, 0)
+        self.root_layout.setSpacing(0)
 
         self.model = HistoryModel()
         self.delegate = HistoryDelegate(palette)
@@ -91,7 +97,6 @@ class MainWindow(QMainWindow):
         # No wrapping: aligned columns beat wrapped lines for readability;
         # a horizontal scrollbar appears when the window is narrower.
         self.help_pane.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        self.help_pane.hide()
 
         self.vars_pane = QListWidget()
         self.vars_pane.setObjectName("varsPane")
@@ -99,10 +104,16 @@ class MainWindow(QMainWindow):
         self.vars_pane.itemClicked.connect(self._insert_var_name)
         self.vars_pane.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.vars_pane.customContextMenuRequested.connect(self._vars_context_menu)
-        self.vars_pane.hide()
 
-        self.input = InputEdit()
-        self.input.setObjectName("input")
+        self.pane_stack = QStackedWidget()
+        self.pane_stack.addWidget(self.history_view)
+        self.pane_stack.addWidget(self.help_pane)
+        self.pane_stack.addWidget(self.vars_pane)
+        self.pane_stack.setCurrentWidget(self.history_view)
+
+        self.input_bar = InputBar()
+        self.input = self.input_bar.input
+        self.preview = self.input_bar.preview
         self.input.setPlaceholderText("type an expression — help for the basics")
         self.input.submitted.connect(self._evaluate)
         self.input.textChanged.connect(self._schedule_preview)
@@ -110,22 +121,16 @@ class MainWindow(QMainWindow):
         self.highlighter = ExprHighlighter(self.input.document(), palette)
         self.completer = Completer(self.input, session, palette)
 
-        self.preview = QLabel(" ")
-        self.preview.setObjectName("preview")
-
-        self.intview = IntegerView(palette, lambda text: QApplication.clipboard().setText(text))
+        self.inspector = Inspector(palette, lambda text: QApplication.clipboard().setText(text))
+        self.vizpanel = self.inspector.vizpanel
+        self.intview = self.inspector.intview
         self.intview.value_to_input.connect(self._set_input)
         self.intview.copied.connect(self._toast)
 
-        self.vizpanel = VizPanel(palette)
-
-        layout.addWidget(self.history_view, stretch=1)
-        layout.addWidget(self.help_pane, stretch=1)
-        layout.addWidget(self.vars_pane, stretch=1)
-        layout.addWidget(self.input)
-        layout.addWidget(self.preview)
-        layout.addWidget(self.vizpanel)
-        layout.addWidget(self.intview)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self._pending_splitter_state: object | None = None
+        self._apply_layout(wide=False)
         self.setCentralWidget(root)
 
         self._build_status_bar()
@@ -156,6 +161,7 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(geometry)
             if s.value("always_on_top", False, type=bool):
                 self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+            self._pending_splitter_state = s.value("splitter_state")
 
         self.intview.show_value(None, session.word_size, session.signed)
         self.input.setFocus()
@@ -206,6 +212,34 @@ class MainWindow(QMainWindow):
             action.setShortcut(QKeySequence(keys))
             action.triggered.connect(handler)
             self.addAction(action)
+
+    def _apply_layout(self, wide: bool) -> None:
+        """Narrow: stack / input bar / inspector, one column. Wide: a
+        splitter puts the stack and inspector side by side, with the input
+        bar spanning the full width underneath.
+
+        Idempotent (resizeEvent calls it on every resize) and safe to call
+        before the window is ever shown (the first call always applies,
+        since `_wide` doesn't exist yet).
+        """
+        if hasattr(self, "_wide") and wide == self._wide:
+            return
+        self._wide = wide
+        for w in (self.pane_stack, self.inspector, self.input_bar, self.splitter):
+            self.root_layout.removeWidget(w)
+        if wide:
+            first_time = self.splitter.count() == 0
+            if first_time:
+                self.splitter.addWidget(self.pane_stack)
+                self.splitter.addWidget(self.inspector)
+            self.root_layout.addWidget(self.splitter, 1)
+            self.root_layout.addWidget(self.input_bar)
+            if first_time and self._pending_splitter_state is not None:
+                self.splitter.restoreState(self._pending_splitter_state)  # type: ignore[arg-type]
+        else:
+            self.root_layout.addWidget(self.pane_stack, 1)
+            self.root_layout.addWidget(self.input_bar)
+            self.root_layout.addWidget(self.inspector)
 
     # -- evaluate / preview -------------------------------------------------------
 
@@ -514,22 +548,16 @@ class MainWindow(QMainWindow):
             self.help_pane.setHtml(general_help_html(SHORTCUT_HELP))
         else:
             self.help_pane.setPlainText(text)
-        self.history_view.hide()
-        self.vars_pane.hide()
-        self.help_pane.show()
+        self.pane_stack.setCurrentWidget(self.help_pane)
 
     def _hide_help(self) -> None:
-        self.help_pane.hide()
-        self.vars_pane.hide()
-        self.history_view.show()
+        self.pane_stack.setCurrentWidget(self.history_view)
 
     # -- variables pane ---------------------------------------------------------
 
     def _show_vars(self) -> None:
         self._refresh_vars_pane()
-        self.history_view.hide()
-        self.help_pane.hide()
-        self.vars_pane.show()
+        self.pane_stack.setCurrentWidget(self.vars_pane)
 
     def _toggle_vars(self) -> None:
         if self.vars_pane.isVisibleTo(self):
@@ -590,6 +618,8 @@ class MainWindow(QMainWindow):
         if self.store is not None:
             save_session(self.session)
             app_settings().setValue("geometry", self.saveGeometry())
+            if self.splitter.count() > 0:
+                app_settings().setValue("splitter_state", self.splitter.saveState())
         super().closeEvent(event)  # type: ignore[arg-type]
 
     def _toast(self, message: str) -> None:
@@ -608,6 +638,8 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event: object) -> None:  # popup geometry would go stale
         if hasattr(self, "completer"):
             self.completer.hide()
+        if hasattr(self, "_wide"):
+            self._apply_layout(self.width() >= WIDE_BREAKPOINT)
         super().resizeEvent(event)  # type: ignore[arg-type]
 
 

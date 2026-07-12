@@ -3,7 +3,7 @@
 The panel shows a *scratch* value seeded from the latest integer result.
 Clicking a bit cell toggles that bit of the scratch value, re-renders all
 bases, and writes the new value into the input line as a hex literal (the
-"→ input" button does the same on demand). A new result reseeds the scratch.
+"-> input" button does the same on demand). A new result reseeds the scratch.
 Float results grey the panel.
 """
 
@@ -288,7 +288,7 @@ class IntegerView(QWidget):
 
         actions = QHBoxLayout()
         actions.setContentsMargins(12, 0, 12, 8)
-        to_input = QPushButton("→ input")
+        to_input = QPushButton("-> input")
         to_input.setProperty("class", "copyBtn")
         to_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         to_input.clicked.connect(self._emit_to_input)

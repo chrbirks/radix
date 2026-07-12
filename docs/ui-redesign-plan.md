@@ -1,6 +1,6 @@
 # Radix UI redesign — "Bench instrument" (execution plan)
 
-Status: **in progress** (WP1 done). This document is self-contained: an executor (human or LLM) with no
+Status: **in progress** (WP1-WP2 done). This document is self-contained: an executor (human or LLM) with no
 prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints are law;
 the non-negotiable ones are repeated in §3 because violating them causes segfaults or data
 loss, not style nits.
@@ -24,7 +24,7 @@ loss, not style nits.
 Progress:
 
 - [x] WP1 — Token system + silkscreen face
-- [ ] WP2 — MainWindow restructure + adaptive layout
+- [x] WP2 — MainWindow restructure + adaptive layout
 - [ ] WP3 — Inspector lanes redesign
 - [ ] WP4 — Register-view bit grid (collapse rail)
 - [ ] WP5 — History as ledger
@@ -117,6 +117,17 @@ and disciplined.
    **measured**. Concretely: the `›` prompt and `…` collapse-rail text are drawn into
    fixed rects / QLabels only; chips and badges measure ASCII text only; never call
    `horizontalAdvance(entry.result)` (assignment results contain `←`).
+   **Found in WP2**: this bites you even without calling `horizontalAdvance` yourself —
+   `QSplitter.addWidget()` eagerly computes every descendant's `sizeHint()` to place its
+   handles, and Qt's own built-in `QPushButton`/`QLabel` `sizeHint()` calls font metrics
+   on their text internally. A `QPushButton("→ input")` (bit_panel.py) segfaulted the
+   instant it landed inside the new wide-mode splitter, even though nothing in this repo
+   called `horizontalAdvance` on it — fixed by changing the label to `"-> input"`. `QLabel`
+   text (`"—"`, `"Δ …"`) was empirically confirmed safe in the same splitter context, so
+   this is specifically a **button-text** (and likely any eagerly-sized widget's) risk:
+   before adding a widget with non-ASCII text to a `QSplitter` (or any new eager-layout
+   container introduced later), test it in isolation first, the way this fix was found —
+   construct the widget, `QSplitter(...).addWidget(it)`, and confirm no segfault.
 2. Always construct `QFontMetrics(font)` yourself; `widget.fontMetrics()` can dangle in
    PySide6 (there is an existing violation to fix at `input_edit.py:27`).
 3. QSS px fonts leave `QFont.pointSize()` at −1 — scale painter fonts via the

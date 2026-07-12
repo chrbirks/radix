@@ -7,9 +7,9 @@ pasted newlines are stripped, and the height is locked to one text row.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QMimeData, Qt, Signal
-from PySide6.QtGui import QKeyEvent, QTextCursor
-from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtCore import QEvent, QMimeData, Qt, Signal
+from PySide6.QtGui import QFontMetrics, QKeyEvent, QTextCursor
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 
 
 class InputEdit(QPlainTextEdit):
@@ -24,7 +24,7 @@ class InputEdit(QPlainTextEdit):
         self._lock_height()
 
     def _lock_height(self) -> None:
-        height = self.fontMetrics().height() + 24  # matches the QSS padding
+        height = QFontMetrics(self.font()).height() + 24  # matches the QSS padding
         self.setFixedHeight(height)
 
     def changeEvent(self, event: object) -> None:  # font/style changes
@@ -52,3 +52,52 @@ class InputEdit(QPlainTextEdit):
 
     def insertFromMimeData(self, source: QMimeData) -> None:
         self.insertPlainText(" ".join(source.text().splitlines()))
+
+
+class InputBar(QWidget):
+    """Prompt glyph + expression input + live preview, styled as one control.
+
+    Grows an accent underline while `input` has focus (the `focused` dynamic
+    property), so the always-focused input line still gives visible feedback
+    when focus briefly leaves it (e.g. a history double-click).
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("inputBar")
+        self.setProperty("focused", "false")
+
+        self.prompt = QLabel("›")
+        self.prompt.setObjectName("prompt")
+
+        self.input = InputEdit()
+        self.input.setObjectName("input")
+        self.input.installEventFilter(self)
+
+        self.preview = QLabel(" ")
+        self.preview.setObjectName("preview")
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        row.addWidget(self.prompt)
+        row.addWidget(self.input, 1)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addLayout(row)
+        layout.addWidget(self.preview)
+
+    def eventFilter(self, obj: object, event: QEvent) -> bool:
+        if obj is self.input and event.type() in (
+            QEvent.Type.FocusIn,
+            QEvent.Type.FocusOut,
+        ):
+            self._set_focused(event.type() == QEvent.Type.FocusIn)
+        return super().eventFilter(obj, event)  # type: ignore[arg-type]
+
+    def _set_focused(self, focused: bool) -> None:
+        self.setProperty("focused", "true" if focused else "false")
+        self.style().unpolish(self)
+        self.style().polish(self)

@@ -497,6 +497,33 @@ def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
     assert win3.session.int_base == "dec"
 
 
+def test_wide_layout_splits_panes_and_evaluates(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    # _apply_layout is the unit under test (resizeEvent is a thin, manually
+    # verified delegation to it keyed on WIDE_BREAKPOINT — exercising it via
+    # a real resize would require a shown top-level window, which segfaults
+    # under the offscreen platform whenever no app-level stylesheet is
+    # applied first, a pre-existing hazard unrelated to this layout logic).
+    window._apply_layout(wide=True)
+    assert window.splitter.count() == 2
+    assert window.pane_stack.parent() is window.splitter
+    assert window.inspector.parent() is window.splitter
+    assert window.input_bar.isVisibleTo(window)
+    _submit(qtbot, window, "0xFF + 1")
+    assert window.model.entries[-1].result == "256"
+    assert window.intview.active
+
+
+def test_narrow_return_reverts_to_single_column(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window._apply_layout(wide=True)
+    assert window.splitter.count() == 2
+    window._apply_layout(wide=False)
+    assert window.splitter.count() == 0
+    assert window.pane_stack.parent() is not window.splitter
+    assert window.inspector.parent() is not window.splitter
+    _submit(qtbot, window, "1 + 1")
+    assert window.model.entries[-1].result == "2"
+
+
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from radix.ui_qt.bit_panel import BYTE_WIDTH
 
