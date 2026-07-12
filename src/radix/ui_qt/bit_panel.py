@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from radix.engine.formatter import FloatViews, format_int_base, integer_views
 from radix.ui_qt.theme import FONT_MICRO, Palette
+from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
 CELL = 24
 GAP = 4
@@ -355,6 +356,10 @@ class IntegerView(QWidget):
         self._copy_texts: dict[str, str] = {}
         self._row_keys: list[str | None] = [None] * LANE_ROWS
         self._row_widgets: list[tuple[QLabel, QLabel, QPushButton]] = []
+        self.readout_caption = ZoneCaption("READOUT")
+        self.readout_caption.set_palette(palette)
+        self.register_caption = ZoneCaption("REGISTER")
+        self.register_caption.set_palette(palette)
         grid = QGridLayout()
         grid.setContentsMargins(12, 8, 12, 4)
         grid.setHorizontalSpacing(10)
@@ -400,7 +405,9 @@ class IntegerView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
+        layout.addWidget(margin_wrap(self.readout_caption, 12))
         layout.addLayout(grid)
+        layout.addWidget(margin_wrap(self.register_caption, 12))
         layout.addWidget(self.grid_widget)
         layout.addLayout(actions)
 
@@ -573,6 +580,8 @@ class IntegerView(QWidget):
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
+        self.readout_caption.set_palette(palette)
+        self.register_caption.set_palette(palette)
         self.grid_widget.set_palette(palette)
         self._refresh()  # re-render the BIN highlight color
 

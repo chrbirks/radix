@@ -284,7 +284,7 @@ class MainWindow(QMainWindow):
             self.input.clear()
             self._toast("cleared")
             self.intview.show_value(None, self.session.word_size, self.session.signed)
-            self.vizpanel.show_payload(None)
+            self.inspector.show_viz_payload(None)
             self._refresh_vars_pane()
             return
         if outcome.value is None:
@@ -361,7 +361,7 @@ class MainWindow(QMainWindow):
         Integers drive the editable bit grid; reals show the read-only
         IEEE-754 view (word size 32/64) or grey the panel (8/16).
         """
-        self.vizpanel.show_payload(value.viz if value is not None else None)
+        self.inspector.show_viz_payload(value.viz if value is not None else None)
         number = value.number if value is not None else None
         if isinstance(number, int):
             self.intview.show_value(number, self.session.word_size, self.session.signed)
@@ -652,8 +652,7 @@ class MainWindow(QMainWindow):
     def apply_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
-        self.intview.set_palette(palette)
-        self.vizpanel.set_palette(palette)
+        self.inspector.set_palette(palette)
         self.highlighter.set_palette(palette)
         self.completer.set_palette(palette)
         self.history_view.viewport().update()

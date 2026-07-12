@@ -110,6 +110,34 @@ def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWin
     assert window.vizpanel.isVisibleTo(window)
 
 
+def test_zone_captions_have_expected_text(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert window.inspector.trace_caption.text() == "TRACE"
+    assert window.intview.readout_caption.text() == "READOUT"
+    assert window.intview.register_caption.text() == "REGISTER"
+
+
+def test_trace_caption_visibility_tracks_vizpanel(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.engine.viz import FixedPointViz
+
+    _submit(qtbot, window, "fix(0.7071, 1, 15)")
+    assert window.inspector.trace_caption.isVisibleTo(window)
+    assert isinstance(window.vizpanel.payload, FixedPointViz)
+    _submit(qtbot, window, "1 + 1")
+    assert not window.inspector.trace_caption.isVisibleTo(window)
+    # The live preview drives it too.
+    window.input.setText("unfix(0x4000, 1, 15)")
+    window._update_preview()
+    assert window.inspector.trace_caption.isVisibleTo(window)
+
+
+def test_zone_caption_heights_match_constant(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.ui_qt.zones import ZONE_CAPTION_H
+
+    assert window.inspector.trace_caption.height() == ZONE_CAPTION_H
+    assert window.intview.readout_caption.height() == ZONE_CAPTION_H
+    assert window.intview.register_caption.height() == ZONE_CAPTION_H
+
+
 def test_viz_panel_clock_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from radix.engine.viz import ClockViz
 

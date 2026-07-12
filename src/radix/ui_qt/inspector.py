@@ -10,21 +10,35 @@ from collections.abc import Callable
 
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+from radix.engine.viz import VizPayload
 from radix.ui_qt.bit_panel import IntegerView
 from radix.ui_qt.theme import Palette
-from radix.ui_qt.viz_panel import VizPanel
+from radix.ui_qt.viz_panel import CARD_PAD, VizPanel
+from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
 
 class Inspector(QWidget):
     def __init__(self, palette: Palette, clipboard_setter: Callable[[str], None]) -> None:
         super().__init__()
         self.setObjectName("inspector")
+        self.trace_caption = ZoneCaption("TRACE")
+        self.trace_caption.set_palette(palette)
         self.vizpanel = VizPanel(palette)
         self.intview = IntegerView(palette, clipboard_setter)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addWidget(margin_wrap(self.trace_caption, CARD_PAD))
         layout.addWidget(self.vizpanel)
         layout.addWidget(self.intview)
         layout.addStretch(1)
+
+    def show_viz_payload(self, payload: VizPayload | None) -> None:
+        self.vizpanel.show_payload(payload)
+        self.trace_caption.setVisible(payload is not None)
+
+    def set_palette(self, palette: Palette) -> None:
+        self.trace_caption.set_palette(palette)
+        self.intview.set_palette(palette)
+        self.vizpanel.set_palette(palette)
