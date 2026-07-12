@@ -54,7 +54,8 @@ SHORTCUT_HELP = """Keyboard shortcuts
   Alt+W        cycle word size   Alt+S        toggle signed/unsigned
   Alt+D        toggle deg/rad    Alt+N        cycle notation
   Alt+B        result base       Alt+T        always on top
-  Alt+V        variables pane    del <name>   remove a variable"""
+  Alt+V        variables pane    del <name>   remove a variable
+  Alt+E        expand/collapse zero rows in the register view"""
 
 
 class MainWindow(QMainWindow):
@@ -207,6 +208,7 @@ class MainWindow(QMainWindow):
             ("Alt+B", self._cycle_int_base),
             ("Alt+T", self._toggle_always_on_top),
             ("Alt+V", self._toggle_vars),
+            ("Alt+E", self._toggle_bit_grid_expanded),
         ):
             action = QAction(self)
             action.setShortcut(QKeySequence(keys))
@@ -564,6 +566,9 @@ class MainWindow(QMainWindow):
             self._hide_help()
         else:
             self._show_vars()
+
+    def _toggle_bit_grid_expanded(self) -> None:
+        self.intview.grid_widget.toggle_expanded()
 
     def _refresh_vars_pane(self) -> None:
         self.vars_pane.clear()

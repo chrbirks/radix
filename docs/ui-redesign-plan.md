@@ -1,6 +1,6 @@
 # Radix UI redesign — "Bench instrument" (execution plan)
 
-Status: **in progress** (WP1-WP3 done). This document is self-contained: an executor (human or LLM) with no
+Status: **in progress** (WP1-WP4 done). This document is self-contained: an executor (human or LLM) with no
 prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints are law;
 the non-negotiable ones are repeated in §3 because violating them causes segfaults or data
 loss, not style nits.
@@ -26,7 +26,7 @@ Progress:
 - [x] WP1 — Token system + silkscreen face
 - [x] WP2 — MainWindow restructure + adaptive layout
 - [x] WP3 — Inspector lanes redesign
-- [ ] WP4 — Register-view bit grid (collapse rail)
+- [x] WP4 — Register-view bit grid (collapse rail)
 - [ ] WP5 — History as ledger
 - [ ] WP6 — Mode chips
 - [ ] WP7 — Viz cards + timing diagram
@@ -372,17 +372,33 @@ from radix.ui_qt.main_window import MainWindow
 from radix.session import Session
 
 app = QApplication(sys.argv)
-theme.load_bundled_font()
+mono, label = theme.load_bundled_font()  # returns (mono_family, label_family) since WP1
+app.setStyleSheet(theme.stylesheet(theme.DARK, mono, label))
+
+def settle():
+    for _ in range(10):
+        app.processEvents()
+
 def snap(exprs, name, pal, size=(600, 800)):
     w = MainWindow(Session(), pal)
-    w.setStyleSheet(theme.stylesheet(pal, theme.MONO_FAMILY))
     w.resize(*size); w.show()
+    settle()
     for e in exprs:
-        w.input.setPlainText(e); app.processEvents()
-        w._evaluate(); app.processEvents()
+        w.input.setPlainText(e); settle()
+        w._evaluate(); settle()
     w.grab().save(name); w.close()
 ```
 (Adapt to constructor/signature changes as they land. Run with `uv run python`.)
+
+**Found in WP4**: a single `app.processEvents()` after `_evaluate()` is not always enough once
+widgets are nested a level or two deeper than the original flat layout (Inspector/pane_stack
+inside root_layout) — a dynamic `setMinimumHeight()` change (e.g. the bit-grid collapse rail)
+can take a couple of event-loop iterations to fully propagate up the layout chain. A screenshot
+taken too early shows widgets overlapping that are actually fine — always use the `settle()`
+loop above (call it after `.show()` and after every state change), not a single `processEvents()`
+call, or you will chase a phantom layout bug that isn't there. Confirmed harmless: real usage
+runs a continuous event loop, so this never shows up outside of scripted single-shot
+screenshots.
 
 ## 8. Risk register
 

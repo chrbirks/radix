@@ -388,6 +388,42 @@ def test_bit_range_drag_selects_without_toggling(qtbot, window: MainWindow) -> N
     assert window.intview.scratch == 0xFE
 
 
+def test_zero_upper_rows_collapse_and_expand(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    grid = window.intview.grid_widget
+    assert grid._collapse_eligible()
+    assert grid._cell_rect(40).isEmpty()
+    grid.toggle_expanded()
+    assert not grid._cell_rect(40).isEmpty()
+    window.intview.toggle_bit(40)
+    expected = 0xFF | (1 << 40)
+    assert window.intview.scratch == expected
+    assert window.input.text() == f"0x{expected:X}"
+
+
+def test_collapse_never_masks_scratch(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    assert window.intview.grid_widget._collapse_eligible()
+    window._cycle_word_size()  # 64 -> 8: display only
+    assert window.intview.scratch == 0xFF
+    window._cycle_word_size()  # 8 -> 16
+    assert window.intview.scratch == 0xFF
+
+
+def test_changed_upper_bit_prevents_collapse(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.ui_qt.bit_panel import BYTE_WIDTH
+
+    grid = window.intview.grid_widget
+    grid.resize(BYTE_WIDTH + 12, 400)  # 8 bits per row
+    grid.set_state(1 << 40, 64, True)
+    grid.set_state(0, 64, True, changed=1 << 40)
+    per_row = grid._bits_per_row()
+    assert per_row == 8
+    changed_row = (63 - 40) // per_row
+    assert grid._hidden_rows() == changed_row  # collapse stops just above it
+    assert not grid._cell_rect(40).isEmpty()  # the changed bit's row stays visible
+
+
 def test_copy_result_shortcut(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 
@@ -543,7 +579,10 @@ def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # t
     grid.set_state(0, 32, True)
     assert grid._bits_per_row() == 8
     assert grid._rows() == 4
-    # Every bit must land inside the widget's width.
+    # All-zero at 32 bits collapses behind the rail: every bit is hidden.
+    assert all(grid._cell_rect(b).isEmpty() for b in range(32))
+    grid.toggle_expanded()
+    # Expanded, every bit must land inside the widget's width.
     assert all(grid._cell_rect(b).right() <= narrow for b in range(32))
     wide = 4 * BYTE_WIDTH + 12  # fits all four byte groups on one row
     grid.resize(wide, 100)
