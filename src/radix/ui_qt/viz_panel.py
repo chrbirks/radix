@@ -30,9 +30,9 @@ CLK_ERR_WARN_PPM = 10_000  # 1%
 CLK_ERR_BAD_PPM = 30_000  # 3%
 # clkdiv waveform strip: drawn only while the divider is small enough to read.
 WAVE_MAX_DIV = 16
-WAVE_ROW_H = 18
+WAVE_ROW_H = 20
 WAVE_GAP = 4
-WAVE_LABEL_W = 48
+WAVE_LABEL_W = 100  # fits "T = 100us"-length labels at FONT_MICRO without clipping
 WAVE_STRIP_MAX_W = 420
 WAVE_STRIP_H = 2 * WAVE_ROW_H + WAVE_GAP + 6
 TICK_H = 3  # rising-edge tick marks below each trace row

@@ -241,7 +241,7 @@ class BitGrid(QWidget):
                     if not rect.isEmpty():
                         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 2, 2)
         label_font = painter.font()
-        label_font.setPixelSize(14)
+        label_font.setPixelSize(16)
         painter.setFont(label_font)
         # Per-nibble hex digit above each 4-cell group (muted when zero,
         # phosphor trace color when set).

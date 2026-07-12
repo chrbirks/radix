@@ -103,12 +103,12 @@ DARK = Palette(
 MONO_FAMILY = "JetBrains Mono"  # readout face: every number and expression
 LABEL_FAMILY = "IBM Plex Sans Condensed SemiBold"  # silkscreen face: micro-labels
 
-FONT_MICRO = 11  # silkscreen labels, bit indices
-FONT_SMALL = 13
-FONT_BODY = 15
-FONT_UI = 17
-FONT_RESULT = 18
-FONT_INPUT = 20
+FONT_MICRO = 13  # silkscreen labels, bit indices
+FONT_SMALL = 15
+FONT_BODY = 17
+FONT_UI = 19
+FONT_RESULT = 20
+FONT_INPUT = 22
 
 SPACE_XS = 4
 SPACE_S = 8

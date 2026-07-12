@@ -36,6 +36,9 @@ ambiguity to resolve about major/minor/patch.
 - The clkdiv clock card's waveform is a proper timing diagram: hairline
   baselines, sharp rising-edge ticks, and the divided row labeled by its
   actual achieved frequency.
+- All UI text is two sizes larger for readability (11-20px scale raised to
+  13-22px). The clock card's waveform label column was widened so its
+  "T = …s" / achieved-frequency labels don't clip at the larger size.
 
 ### Fixed
 
