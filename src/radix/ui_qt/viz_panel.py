@@ -13,16 +13,18 @@ from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 from radix.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz, VizPayload
-from radix.ui_qt.theme import Palette
+from radix.ui_qt.theme import FONT_BODY, FONT_MICRO, Palette
 
 VIZ_CELL = 18
 VIZ_GAP = 3
 POINT_GAP = 14  # widened gap holding the binary-point tick
-MARGIN = 12
+CARD_PAD = 12
 LINE_H = 24
 BAR_H = VIZ_CELL + 4
-METER_W = 140
+METER_W = 140  # fixed-point quantization-error meter
 METER_H = 8
+METER_TRACK_W = 200  # mem-sizing address-space utilization bar
+METER_MIN_CLEARANCE = 380  # skip the error meter if it would collide with the text
 # clkdiv error color thresholds (a UART is unhappy past ~2-3%).
 CLK_ERR_WARN_PPM = 10_000  # 1%
 CLK_ERR_BAD_PPM = 30_000  # 3%
@@ -31,7 +33,9 @@ WAVE_MAX_DIV = 16
 WAVE_ROW_H = 18
 WAVE_GAP = 4
 WAVE_LABEL_W = 48
+WAVE_STRIP_MAX_W = 420
 WAVE_STRIP_H = 2 * WAVE_ROW_H + WAVE_GAP + 6
+TICK_H = 3  # rising-edge tick marks below each trace row
 
 
 def _has_wave(viz: ClockViz) -> bool:
@@ -91,30 +95,31 @@ class VizPanel(QWidget):
     def _paint_mem(self, painter: QPainter, viz: MemViz) -> None:
         p = self.palette_tokens
         font = painter.font()
-        font.setPixelSize(15)
+        font.setPixelSize(FONT_BODY)
         painter.setFont(font)
         painter.setPen(QColor(p.text))
         line = (
             f"{viz.depth} x {viz.width} bit    addr {viz.addr_bits} bits"
             f"    {viz.total_bits} bits = {viz.bytes_text}"
         )
-        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, 8, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, line)
         # Address-space utilization bar: full track = 2^addr_bits entries.
         y = 8 + LINE_H + (LINE_H - METER_H) / 2
-        track_w = 200
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(p.bit_off))
-        painter.drawRoundedRect(QRectF(MARGIN, y, track_w, METER_H), 3, 3)
+        painter.drawRoundedRect(QRectF(CARD_PAD, y, METER_TRACK_W, METER_H), 3, 3)
         full = viz.utilization >= 1.0
-        painter.setBrush(QColor(p.accent if full else p.bit_changed))
-        painter.drawRoundedRect(QRectF(MARGIN, y, track_w * viz.utilization, METER_H), 3, 3)
+        painter.setBrush(QColor(p.ok if full else p.bit_on))
+        painter.drawRoundedRect(
+            QRectF(CARD_PAD, y, METER_TRACK_W * viz.utilization, METER_H), 3, 3
+        )
         painter.setPen(QColor(p.muted))
         label = f"{viz.depth} / {viz.addressable} addressable ({viz.util_text})"
         if full:
             label += "  power of two"
         painter.drawText(
-            QRectF(MARGIN + track_w + 10, 8 + LINE_H, self.width() - MARGIN, LINE_H),
+            QRectF(CARD_PAD + METER_TRACK_W + 10, 8 + LINE_H, self.width() - CARD_PAD, LINE_H),
             Qt.AlignmentFlag.AlignVCenter, label,
         )
 
@@ -123,30 +128,30 @@ class VizPanel(QWidget):
     def _paint_clock(self, painter: QPainter, viz: ClockViz) -> None:
         p = self.palette_tokens
         font = painter.font()
-        font.setPixelSize(15)
+        font.setPixelSize(FONT_BODY)
         painter.setFont(font)
         painter.setPen(QColor(p.text))
         line = f"freq {viz.freq_text}Hz    period {viz.period_text}s"
-        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, 8, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, line)
         if viz.divisor is None:
             return
         y = 8 + LINE_H
         left = f"/ {viz.divisor}  ->  {viz.achieved_text}Hz  (target {viz.target_text}Hz)   "
-        painter.drawText(QRectF(MARGIN, y, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, y, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, left)
         # Error, color-coded against UART-style tolerance.
         ppm = abs(viz.error_ppm or 0.0)
         if ppm >= CLK_ERR_BAD_PPM:
             color = p.error
         elif ppm >= CLK_ERR_WARN_PPM:
-            color = p.bit_changed
+            color = p.warn
         else:
-            color = p.float_exp
+            color = p.ok
         painter.setPen(QColor(color))
         # QFontMetrics on painter fonts is safe here: the strings are ASCII.
         offset = painter.fontMetrics().horizontalAdvance(left)
-        painter.drawText(QRectF(MARGIN + offset, y, self.width() - 2 * MARGIN - offset, LINE_H),
+        painter.drawText(QRectF(CARD_PAD + offset, y, self.width() - 2 * CARD_PAD - offset, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, f"err {viz.error_text}")
 
         # Waveform strip: two divided-output periods, rising edges aligned at x0.
@@ -155,8 +160,8 @@ class VizPanel(QWidget):
         assert viz.wave_high is not None and viz.wave_low is not None
         high, low = viz.wave_high, viz.wave_low
         half_units = 4 * viz.divisor  # ref half-cycles across the strip
-        x0 = MARGIN + WAVE_LABEL_W
-        strip_w = min(self.width() - 2 * MARGIN - WAVE_LABEL_W, 420)
+        x0 = CARD_PAD + WAVE_LABEL_W
+        strip_w = min(self.width() - 2 * CARD_PAD - WAVE_LABEL_W, WAVE_STRIP_MAX_W)
         px = strip_w / half_units
 
         def wave(y_row: float, spans: list[int]) -> QPolygonF:
@@ -172,26 +177,51 @@ class VizPanel(QWidget):
                 level_high = not level_high
             return QPolygonF(pts)
 
+        def rising_edges(spans: list[int]) -> list[float]:
+            """X positions where the trace goes low -> high (always starts on one)."""
+            xs = [float(x0)]
+            x = float(x0)
+            level_high = True
+            for span in spans:
+                x += span * px
+                level_high = not level_high
+                if level_high:
+                    xs.append(x)
+            return xs
+
+        label_font = painter.font()
+        label_font.setPixelSize(FONT_MICRO)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         rows = (
-            ("clk", [1] * half_units, QPen(QColor(p.muted), 1.5)),
-            (f"/{viz.divisor}", [high, low, high, low], QPen(QColor(p.accent), 2.0)),
+            (f"T = {viz.period_text}s", [1] * half_units, p.muted, 1.5),
+            (f"{viz.achieved_text}Hz", [high, low, high, low], p.bit_on, 2.0),
         )
-        for i, (label, spans, pen) in enumerate(rows):
+        for i, (label, spans, color, width) in enumerate(rows):
             y_row = 8 + 2 * LINE_H + i * (WAVE_ROW_H + WAVE_GAP)
+            y_bot = y_row + WAVE_ROW_H - 2.0
+            # Hairline baseline under the trace, sharp square joins on the trace itself.
+            painter.setPen(QPen(QColor(p.hairline), 1))
+            painter.drawLine(QPointF(x0, y_bot), QPointF(x0 + strip_w, y_bot))
+            painter.setFont(label_font)
             painter.setPen(QColor(p.muted))
-            painter.drawText(QRectF(MARGIN, y_row, WAVE_LABEL_W - 8, WAVE_ROW_H),
+            painter.drawText(QRectF(CARD_PAD, y_row, WAVE_LABEL_W - 8, WAVE_ROW_H),
                              Qt.AlignmentFlag.AlignVCenter, label)
+            pen = QPen(QColor(color), width)
+            pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
             painter.setPen(pen)
             painter.drawPolyline(wave(y_row, spans))
+            painter.setPen(QPen(QColor(color), 1))
+            for tick_x in rising_edges(spans):
+                painter.drawLine(QPointF(tick_x, y_bot + 1), QPointF(tick_x, y_bot + 1 + TICK_H))
         if viz.duty_text is not None:
             duty = f"duty {viz.duty_text}"
             x_duty = x0 + strip_w + 10
-            if x_duty + painter.fontMetrics().horizontalAdvance(duty) < self.width() - MARGIN:
+            painter.setFont(label_font)
+            if x_duty + painter.fontMetrics().horizontalAdvance(duty) < self.width() - CARD_PAD:
                 painter.setPen(QColor(p.muted))
                 y_row = 8 + 2 * LINE_H + WAVE_ROW_H + WAVE_GAP
                 painter.drawText(
-                    QRectF(x_duty, y_row, self.width() - MARGIN - x_duty, WAVE_ROW_H),
+                    QRectF(x_duty, y_row, self.width() - CARD_PAD - x_duty, WAVE_ROW_H),
                     Qt.AlignmentFlag.AlignVCenter, duty)
 
     # -- fixed-point Qm.n -------------------------------------------------------
@@ -200,24 +230,24 @@ class VizPanel(QWidget):
         p = self.palette_tokens
         total = viz.m + viz.n
         font = painter.font()
-        font.setPixelSize(15)
+        font.setPixelSize(FONT_BODY)
         painter.setFont(font)
 
         # Title: format + raw word.
         painter.setPen(QColor(p.text))
         title = f"Q{viz.m}.{viz.n}   raw 0x{viz.raw:X}"
-        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, 8, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, title)
 
         # Bit-cell bar: integer band (MSB cell = sign) | point | fraction band.
         cell = VIZ_CELL
-        need = total * (cell + VIZ_GAP) + POINT_GAP + 2 * MARGIN
+        need = total * (cell + VIZ_GAP) + POINT_GAP + 2 * CARD_PAD
         if need > self.width():  # shrink to fit very wide formats
-            cell = max(5, (self.width() - 2 * MARGIN - POINT_GAP) // total - VIZ_GAP)
+            cell = max(5, (self.width() - 2 * CARD_PAD - POINT_GAP) // total - VIZ_GAP)
         y = 8 + LINE_H
         for i in range(total):
             bit = total - 1 - i  # MSB first
-            x = MARGIN + i * (cell + VIZ_GAP) + (POINT_GAP if bit < viz.n else 0)
+            x = CARD_PAD + i * (cell + VIZ_GAP) + (POINT_GAP if bit < viz.n else 0)
             if bit == total - 1:
                 base = p.float_sign  # two's-complement sign bit
             elif bit >= viz.n:
@@ -231,7 +261,7 @@ class VizPanel(QWidget):
             painter.setBrush(color)
             painter.drawRoundedRect(QRectF(x, y, cell, VIZ_CELL), 2, 2)
         # Binary-point tick between integer and fraction bands.
-        tick_x = MARGIN + viz.m * (cell + VIZ_GAP) + POINT_GAP / 2 - VIZ_GAP / 2
+        tick_x = CARD_PAD + viz.m * (cell + VIZ_GAP) + POINT_GAP / 2 - VIZ_GAP / 2
         painter.setPen(QColor(p.text))
         painter.drawLine(int(tick_x), y - 2, int(tick_x), y + VIZ_CELL + 2)
 
@@ -245,18 +275,18 @@ class VizPanel(QWidget):
                 f"{viz.exact_text} -> {viz.stored_text}"
                 f"   err {viz.error_text} ({viz.error_lsb:.2f} LSB)"
             )
-        painter.drawText(QRectF(MARGIN, y2, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, y2, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, text)
-        meter_x = self.width() - MARGIN - METER_W
+        meter_x = self.width() - CARD_PAD - METER_W
         meter_y = y2 + (LINE_H - METER_H) / 2
-        if meter_x > MARGIN + 380:  # only when it doesn't collide with the text
+        if meter_x > CARD_PAD + METER_MIN_CLEARANCE:  # skip if it'd collide with the text
             track = QColor(p.bit_off)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(track)
             painter.drawRoundedRect(QRectF(meter_x, meter_y, METER_W, METER_H), 3, 3)
             frac = min(1.0, viz.error_lsb / 0.5)
             if frac > 0:
-                painter.setBrush(QColor(p.bit_changed if frac > 0.5 else p.accent))
+                painter.setBrush(QColor(p.warn if frac > 0.5 else p.ok))
                 painter.drawRoundedRect(QRectF(meter_x, meter_y, METER_W * frac, METER_H), 3, 3)
 
     # -- IEEE-754 float32/float64 -------------------------------------------------
@@ -264,7 +294,7 @@ class VizPanel(QWidget):
     def _paint_floatbits(self, painter: QPainter, viz: FloatBitsViz) -> None:
         p = self.palette_tokens
         font = painter.font()
-        font.setPixelSize(15)
+        font.setPixelSize(FONT_BODY)
         painter.setFont(font)
 
         # Title: format + stored value + raw pattern (+ the pre-rounding value).
@@ -272,14 +302,14 @@ class VizPanel(QWidget):
         title = f"float{viz.width}   {viz.stored_text}   raw {viz.hex_text}"
         if viz.rounded and viz.exact_text != viz.stored_text:
             title += f"   (from {viz.exact_text})"
-        painter.drawText(QRectF(MARGIN, 8, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, 8, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, title)
 
         # Bit-cell bar: sign | exponent | mantissa bands, a field gap between each.
         cell = VIZ_CELL
-        need = viz.width * (cell + VIZ_GAP) + 2 * POINT_GAP + 2 * MARGIN
+        need = viz.width * (cell + VIZ_GAP) + 2 * POINT_GAP + 2 * CARD_PAD
         if need > self.width():  # shrink so 64 cells fit the minimum window
-            cell = max(4, (self.width() - 2 * MARGIN - 2 * POINT_GAP) // viz.width - VIZ_GAP)
+            cell = max(4, (self.width() - 2 * CARD_PAD - 2 * POINT_GAP) // viz.width - VIZ_GAP)
         y = 8 + LINE_H
         painter.setPen(Qt.PenStyle.NoPen)
         for i in range(viz.width):
@@ -290,7 +320,7 @@ class VizPanel(QWidget):
                 base, shift = p.float_exp, POINT_GAP  # exponent band
             else:
                 base, shift = p.float_man, 2 * POINT_GAP  # mantissa band
-            x = MARGIN + i * (cell + VIZ_GAP) + shift
+            x = CARD_PAD + i * (cell + VIZ_GAP) + shift
             color = QColor(base)
             if not (viz.bits >> bit) & 1:
                 color.setAlphaF(0.22)
@@ -300,5 +330,5 @@ class VizPanel(QWidget):
         # Decoded fields.
         painter.setPen(QColor(p.text))
         line = f"sign {viz.sign_text}   exp {viz.exponent_text}   man {viz.mantissa_text}"
-        painter.drawText(QRectF(MARGIN, y + BAR_H, self.width() - 2 * MARGIN, LINE_H),
+        painter.drawText(QRectF(CARD_PAD, y + BAR_H, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, line)

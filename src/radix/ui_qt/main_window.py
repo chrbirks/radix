@@ -42,7 +42,7 @@ from radix.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryMode
 from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
-from radix.ui_qt.theme import Palette
+from radix.ui_qt.theme import LABEL_FAMILY, Palette
 
 PREVIEW_DEBOUNCE_MS = 100
 WIDE_BREAKPOINT = 900  # splitter (pane stack | inspector) above this width
@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         self.palette_tokens = palette
         self.store = store  # None = no persistence (tests)
         self.recall_index: int | None = None
+        self._help_overview_shown = False
         self.last_result_text = ""
 
         self.setWindowTitle(f"Radix v{__version__}")
@@ -559,8 +560,18 @@ class MainWindow(QMainWindow):
 
     # -- help / misc -----------------------------------------------------------------
 
+    def _style_help_pane(self, palette: Palette) -> None:
+        """Section headers in the silkscreen face — set before every setHtml,
+        since Qt applies a document's default stylesheet at that call."""
+        self.help_pane.document().setDefaultStyleSheet(
+            f"h3 {{ color: {palette.accent}; font-family: '{LABEL_FAMILY}'; "
+            f"letter-spacing: 1px; }}"
+        )
+
     def _show_help(self, text: str | None = None) -> None:
+        self._help_overview_shown = text is None
         if text is None:
+            self._style_help_pane(self.palette_tokens)
             self.help_pane.setHtml(general_help_html(SHORTCUT_HELP))
         else:
             self.help_pane.setPlainText(text)
@@ -653,6 +664,8 @@ class MainWindow(QMainWindow):
         self.highlighter.set_palette(palette)
         self.completer.set_palette(palette)
         self.history_view.viewport().update()
+        if self._help_overview_shown and self.help_pane.isVisibleTo(self):
+            self._show_help()  # setHtml applies the stylesheet at parse time
 
     def resizeEvent(self, event: object) -> None:  # popup geometry would go stale
         if hasattr(self, "completer"):
