@@ -37,15 +37,17 @@ def test_float_result_shows_ieee754_view(qtbot, window: MainWindow) -> None:  # 
     assert not window.intview.active  # no integer scratch
     assert window.intview.float_mode is not None
     assert window.intview.rows["HEX"][1].text() == "0x4004_0000_0000_0000"
-    assert window.intview.rows["SGN"][0].text() == "EXP"  # rows relabeled
-    assert window.intview.rows["SGN"][1].text() == "1024 - bias 1023 = 2^1"
+    assert window.intview.rows["EXP"][0].text() == "EXP"
+    assert window.intview.rows["EXP"][1].text() == "1024 - bias 1023 = 2^1"
+    assert "SGN" in window.intview.rows
     # 8/16-bit words have no float format: panel greys as before.
     window.session.word_size = 8
     window._update_preview()
     _submit(qtbot, window, "sin(1)")
     assert window.intview.float_mode is None
     assert not window.intview.active
-    assert window.intview.rows["SGN"][0].text() == "SGN"  # labels restored
+    assert "EXP" not in window.intview.rows  # float-only lanes gone
+    assert "DEC" in window.intview.rows  # integer lanes restored
 
 
 def test_float_view_is_read_only(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -322,6 +324,25 @@ def test_bit_toggle_marks_single_changed_bit(qtbot, window: MainWindow) -> None:
 def test_ascii_row(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "0x746F6B31")
     assert window.intview.rows["ASC"][1].text() == "....tok1"
+    _submit(qtbot, window, "0xFFFF")  # no printable byte: lane hidden
+    assert "ASC" not in window.intview.rows
+
+
+def test_bin_lane_removed_and_ascii_lane_hides(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0b1010")
+    assert "BIN" not in window.intview.rows  # the grid is the binary rendering now
+    _submit(qtbot, window, "0xFFFF")
+    assert "ASC" not in window.intview.rows
+    _submit(qtbot, window, "0x746F6B31")
+    assert "ASC" in window.intview.rows
+
+
+def test_dec_lane_shows_signed_when_differs(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window._cycle_word_size()  # 64 -> 8
+    _submit(qtbot, window, "0xFF")
+    dec_text = window.intview.rows["DEC"][1].text()
+    assert "255" in dec_text
+    assert "-1" in dec_text
 
 
 def test_bit_range_selection_readout_and_to_input(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -365,17 +386,6 @@ def test_bit_range_drag_selects_without_toggling(qtbot, window: MainWindow) -> N
     grid.mouseReleaseEvent(mouse(QEvent.Type.MouseButtonRelease, 0, Qt.MouseButton.NoButton))
     assert grid.selection is None
     assert window.intview.scratch == 0xFE
-
-
-def test_bin_row_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from PySide6.QtWidgets import QApplication
-
-    _submit(qtbot, window, "0b1010")
-    label_text = window.intview.rows["BIN"][1].text()
-    assert '<span style="color:' in label_text  # 1s are colored
-    window.intview.copy_base("BIN")
-    copied = QApplication.clipboard().text()
-    assert "<" not in copied and copied.endswith("1010")
 
 
 def test_copy_result_shortcut(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]

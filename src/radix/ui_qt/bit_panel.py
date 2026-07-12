@@ -32,6 +32,7 @@ HEX_H = 18  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
+LANE_ROWS = 4  # max simultaneous lanes: integer mode uses <=3, float mode uses 4
 
 
 class BitGrid(QWidget):
@@ -262,25 +263,27 @@ class IntegerView(QWidget):
 
         self.rows: dict[str, tuple[QLabel, QLabel]] = {}
         self._copy_texts: dict[str, str] = {}
+        self._row_keys: list[str | None] = [None] * LANE_ROWS
+        self._row_widgets: list[tuple[QLabel, QLabel, QPushButton]] = []
         grid = QGridLayout()
         grid.setContentsMargins(12, 8, 12, 4)
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(2)
-        for i, base in enumerate(("HEX", "DEC", "SGN", "BIN", "ASC")):
-            name = QLabel(base)
-            name.setProperty("class", "baseName")
-            value = QLabel("—")
-            value.setProperty("class", "baseValue")
+        for i in range(LANE_ROWS):
+            name = QLabel("")
+            name.setProperty("class", "laneName")
+            value = QLabel("")
+            value.setProperty("class", "laneValue")
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             copy_btn = QPushButton("copy")
             copy_btn.setProperty("class", "copyBtn")
             copy_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            copy_btn.clicked.connect(lambda _=False, b=base: self.copy_base(b))
+            copy_btn.clicked.connect(lambda _=False, row=i: self._copy_row(row))
             grid.addWidget(name, i, 0)
             grid.addWidget(value, i, 1)
             grid.addWidget(copy_btn, i, 2)
             grid.setColumnStretch(1, 1)
-            self.rows[base] = (name, value)
+            self._row_widgets.append((name, value, copy_btn))
 
         self.grid_widget = BitGrid(palette)
         self.grid_widget.bit_toggled.connect(self.toggle_bit)
@@ -355,36 +358,56 @@ class IntegerView(QWidget):
     def _masked_scratch(self) -> int:
         return self.scratch & ((1 << self.word_size) - 1)
 
+    def _set_lanes(self, lanes: list[tuple[str, str]], dimmed: bool) -> None:
+        """Rebuild `self.rows` from an ordered (key, value_text) list.
+
+        Reuses the fixed pool of row widgets — extra rows beyond `len(lanes)`
+        are hidden rather than destroyed.
+        """
+        self.rows = {}
+        self._row_keys = [None] * LANE_ROWS
+        for i, (name_label, value_label, copy_btn) in enumerate(self._row_widgets):
+            if i >= len(lanes):
+                name_label.hide()
+                value_label.hide()
+                copy_btn.hide()
+                continue
+            key, text = lanes[i]
+            name_label.show()
+            value_label.show()
+            copy_btn.show()
+            name_label.setText(key)
+            value_label.setText(text)
+            value_label.setToolTip(text)
+            for w in (name_label, value_label):
+                w.setProperty("dimmed", "true" if dimmed else "false")
+                w.style().unpolish(w)
+                w.style().polish(w)
+            self._row_keys[i] = key
+            self.rows[key] = (name_label, value_label)
+
+    def _copy_row(self, row: int) -> None:
+        key = self._row_keys[row]
+        if key is not None:
+            self.copy_base(key)
+
     def _refresh(self) -> None:
         if self.float_mode is not None:
             self._refresh_float(self.float_mode)
             return
         views = integer_views(self.scratch, self.word_size)
-        texts = {
-            "HEX": views.hex,
-            "DEC": views.dec_unsigned,
-            "SGN": views.dec_signed,
-            "BIN": views.binary,
-            "ASC": views.ascii,
-        }
-        self._copy_texts = texts
-        for base, (name, value_label) in self.rows.items():
-            name.setText(base)
-            if not self.active:
-                value_label.setText("—")
-            elif base == "BIN":
-                # Set bits in the bit-grid blue so 1s stand out from 0s.
-                highlighted = texts[base].replace(
-                    "1", f'<span style="color:{self.palette_tokens.bit_on}">1</span>'
-                )
-                value_label.setText(highlighted)
-            else:
-                value_label.setText(texts[base])
-            value_label.setToolTip(texts[base] if self.active else "")  # full text when clipped
-            for w in (name, value_label):
-                w.setProperty("dimmed", "false" if self.active else "true")
-                w.style().unpolish(w)
-                w.style().polish(w)
+        dec_text = views.dec_unsigned
+        if views.dec_signed != views.dec_unsigned:
+            dec_text = f"{views.dec_unsigned}  ({views.dec_signed})"
+        self._copy_texts = {"HEX": views.hex, "DEC": views.dec_unsigned, "ASC": views.ascii}
+        placeholder = "—"
+        lanes = [
+            ("HEX", views.hex if self.active else placeholder),
+            ("DEC", dec_text if self.active else placeholder),
+        ]
+        if any(ch != "." for ch in views.ascii):
+            lanes.append(("ASC", views.ascii if self.active else placeholder))
+        self._set_lanes(lanes, dimmed=not self.active)
         mask = (1 << self.word_size) - 1
         changed = self.changed & mask if self.active else 0
         if changed:
@@ -402,23 +425,19 @@ class IntegerView(QWidget):
         The scratch value is untouched — leaving float mode restores the
         integer view exactly as it was.
         """
-        names = {"HEX": "HEX", "DEC": "SGN", "SGN": "EXP", "BIN": "MAN", "ASC": ""}
-        texts = {
+        self._copy_texts = {
             "HEX": views.hex,
-            "DEC": views.sign_text,
-            "SGN": views.exponent_text,
-            "BIN": views.mantissa_text,
-            "ASC": "",
+            "SGN": views.sign_text,
+            "EXP": views.exponent_text,
+            "MAN": views.mantissa_text,
         }
-        self._copy_texts = texts
-        for base, (name, value_label) in self.rows.items():
-            name.setText(names[base])
-            value_label.setText(texts[base])
-            value_label.setToolTip(texts[base])
-            for w in (name, value_label):
-                w.setProperty("dimmed", "false" if names[base] else "true")
-                w.style().unpolish(w)
-                w.style().polish(w)
+        lanes = [
+            ("HEX", views.hex),
+            ("SGN", views.sign_text),
+            ("EXP", views.exponent_text),
+            ("MAN", views.mantissa_text),
+        ]
+        self._set_lanes(lanes, dimmed=False)
         self.delta_label.setText("")
         self.grid_widget.set_state(
             views.bits,
