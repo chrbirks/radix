@@ -1,4 +1,4 @@
-# PyInstaller spec for Calcutron-9000.
+# PyInstaller spec for Radix.
 #
 # Deliberate choices (see plan):
 # - onedir, NOT onefile: onefile self-extracts to temp on every launch (slow
@@ -33,7 +33,10 @@ a = Analysis(
     ["entry.py"],
     pathex=["../src"],
     binaries=[],
-    datas=[("../src/calcutron/ui_qt/fonts", "calcutron/ui_qt/fonts")],
+    datas=[
+        ("../src/radix/ui_qt/fonts", "radix/ui_qt/fonts"),
+        ("../src/radix/ui_qt/icons", "radix/ui_qt/icons"),
+    ],
     hiddenimports=[],
     excludes=["tkinter", "test", "unittest", "pydoc_data", *EXCLUDED_QT],
     noarchive=False,
@@ -45,11 +48,12 @@ exe = EXE(
     pyz,
     a.scripts,
     exclude_binaries=True,
-    name="calcutron",
+    name="radix",
     debug=False,
     strip=False,
     upx=False,
     console=False,  # GUI app; -e still works because stdout is inherited when present
+    icon="icon.ico",
 )
 
 coll = COLLECT(
@@ -58,5 +62,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="calcutron",
+    name="radix",
 )

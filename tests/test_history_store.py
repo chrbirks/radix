@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from calcutron.history.store import HistoryStore
+from radix.history.store import HistoryStore
 
 
 def test_roundtrip(tmp_path: Path) -> None:

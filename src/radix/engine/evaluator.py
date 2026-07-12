@@ -19,14 +19,14 @@ from collections.abc import Mapping
 
 import mpmath
 
-from calcutron.engine.errors import EvalError, Span
-from calcutron.engine.functions import (
+from radix.engine.errors import EvalError, Span
+from radix.engine.functions import (
     CONSTANTS,
     FUNCTIONS,
     EvalContext,
     FunctionDomainError,
 )
-from calcutron.engine.nodes import (
+from radix.engine.nodes import (
     Assign,
     Binary,
     Call,
@@ -36,7 +36,7 @@ from calcutron.engine.nodes import (
     Slice,
     Unary,
 )
-from calcutron.engine.values import Number, Value
+from radix.engine.values import Number, Value
 
 # Guards against pathological input.
 MAX_POW_RESULT_BITS = 1_000_000

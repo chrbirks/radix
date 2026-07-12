@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Calcutron-9000 are documented in this file.
+All notable changes to Radix (formerly Calcutron-9000) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -94,6 +94,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed the app from Calcutron-9000 to **Radix** — the actual mathematical
+  term for "the base of a number system," which is what the dec/hex/bin
+  simultaneous display has always been about. The package, CLI command
+  (`calcutron` → `radix`), and import paths (`calcutron.*` → `radix.*`) all
+  changed to match. Settings and history now live under a new `radix` config
+  directory (`~/.config/radix` on Linux, `%APPDATA%\radix` on Windows) instead
+  of `calcutron` — nothing migrates automatically, so a fresh install starts
+  with default settings and empty history.
+- Added an app icon: a white radical-sign (√) mark on the accent-blue tile,
+  used for the window/taskbar icon on both platforms.
 - Larger bit-grid cells (24 px) for readability.
 - Clicking a bit in the grid now writes the edited value straight into the
   input field as a hex literal (previously only via the "→ input" button).

@@ -22,9 +22,9 @@ Errors at end-of-input raise IncompleteError so the live preview can tell
 
 from __future__ import annotations
 
-from calcutron.engine.errors import IncompleteError, ParseError, Span
-from calcutron.engine.lexer import Token, tokenize
-from calcutron.engine.nodes import (
+from radix.engine.errors import IncompleteError, ParseError, Span
+from radix.engine.lexer import Token, tokenize
+from radix.engine.nodes import (
     Assign,
     Binary,
     Call,

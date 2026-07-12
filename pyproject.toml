@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "calcutron"
+name = "radix"
 dynamic = ["version"]
-description = "Calcutron-9000: keyboard-first scientific + programmer calculator for engineers"
+description = "Radix: keyboard-first scientific + programmer calculator for engineers"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-calcutron = "calcutron.__main__:main"
+radix = "radix.__main__:main"
 
 [dependency-groups]
 dev = [
@@ -29,10 +29,10 @@ dev = [
 ]
 
 [tool.hatch.version]
-path = "src/calcutron/__init__.py"
+path = "src/radix/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/calcutron"]
+packages = ["src/radix"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -47,10 +47,10 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["calcutron"]
+packages = ["radix"]
 
 [[tool.mypy.overrides]]
-module = "calcutron.engine.*"
+module = "radix.engine.*"
 strict = true
 
 [[tool.mypy.overrides]]

@@ -12,8 +12,8 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
-from calcutron.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz, VizPayload
-from calcutron.ui_qt.theme import Palette
+from radix.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz, VizPayload
+from radix.ui_qt.theme import Palette
 
 VIZ_CELL = 18
 VIZ_GAP = 3

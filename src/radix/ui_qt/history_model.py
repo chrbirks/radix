@@ -17,9 +17,9 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
 
-from calcutron.engine.values import Value
-from calcutron.ui_qt.highlight import classify, color_for
-from calcutron.ui_qt.theme import Palette
+from radix.engine.values import Value
+from radix.ui_qt.highlight import classify, color_for
+from radix.ui_qt.theme import Palette
 
 EXPRESSION_ROLE = Qt.ItemDataRole.UserRole + 1
 RESULT_ROLE = Qt.ItemDataRole.UserRole + 2

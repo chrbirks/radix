@@ -1,4 +1,4 @@
-"""Entry point: `calcutron` launches the GUI, `calcutron -e EXPR` evaluates once.
+"""Entry point: `radix` launches the GUI, `radix -e EXPR` evaluates once.
 
 The -e form is also the frozen-binary smoke test in CI, so it must not require
 a display.
@@ -9,9 +9,9 @@ from __future__ import annotations
 import argparse
 import sys
 
-from calcutron import __version__
-from calcutron.engine.errors import CalcError
-from calcutron.session import Session
+from radix import __version__
+from radix.engine.errors import CalcError
+from radix.session import Session
 
 
 def run_expression(session: Session, text: str) -> int:
@@ -44,16 +44,16 @@ def run_expression(session: Session, text: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="calcutron", description="Calcutron-9000 calculator")
+    parser = argparse.ArgumentParser(prog="radix", description="Radix calculator")
     parser.add_argument("-e", "--evaluate", metavar="EXPR", help="evaluate once and exit")
     parser.add_argument(
-        "--version", action="version", version=f"Calcutron-9000 {__version__}"
+        "--version", action="version", version=f"Radix {__version__}"
     )
     args = parser.parse_args(argv)
     session = Session()
     if args.evaluate is not None:
         return run_expression(session, args.evaluate)
-    from calcutron.ui_qt.app import run_gui
+    from radix.ui_qt.app import run_gui
 
     return run_gui(session)
 

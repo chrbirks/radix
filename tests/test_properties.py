@@ -16,9 +16,9 @@ import mpmath
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from calcutron.engine.errors import CalcError
-from calcutron.engine.formatter import format_real
-from calcutron.session import Session
+from radix.engine.errors import CalcError
+from radix.engine.formatter import format_real
+from radix.session import Session
 
 expression_alphabet = st.text(
     alphabet="0123456789.eE+-*/%^&|~<>()[]:,_ xkMGTpnufm'\"abcdhoi",

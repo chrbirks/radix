@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import sys
 
-from calcutron.session import Session
+from radix.session import Session
 
 
 def run_gui(session: Session) -> int:
     from PySide6.QtWidgets import QApplication
 
-    from calcutron import __version__
-    from calcutron.history.store import HistoryStore
-    from calcutron.ui_qt import theme
-    from calcutron.ui_qt.main_window import MainWindow
+    from radix import __version__
+    from radix.history.store import HistoryStore
+    from radix.ui_qt import theme
+    from radix.ui_qt.main_window import MainWindow
 
     app = QApplication(sys.argv[:1])
-    app.setApplicationName("Calcutron-9000")
+    app.setApplicationName("Radix")
     app.setApplicationVersion(__version__)
     app.setStyle("Fusion")
+    app.setWindowIcon(theme.load_app_icon())
 
     mono = theme.load_bundled_font()
 

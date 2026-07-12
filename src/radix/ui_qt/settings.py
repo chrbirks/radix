@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSettings
 
-from calcutron.session import INT_BASES, NOTATIONS, WORD_SIZES, Session
+from radix.session import INT_BASES, NOTATIONS, WORD_SIZES, Session
 
 
 def app_settings() -> QSettings:
     return QSettings(
-        QSettings.Format.IniFormat, QSettings.Scope.UserScope, "calcutron", "calcutron"
+        QSettings.Format.IniFormat, QSettings.Scope.UserScope, "radix", "radix"
     )
 
 

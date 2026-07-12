@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from calcutron.engine.errors import EvalError
-from calcutron.session import Session
+from radix.engine.errors import EvalError
+from radix.session import Session
 
 
 def run(text: str, **settings: object) -> str:
@@ -101,7 +101,7 @@ def test_fix_unfix_roundtrip() -> None:
 
 
 def test_clkdiv_golden_and_viz() -> None:
-    from calcutron.engine.viz import ClockViz
+    from radix.engine.viz import ClockViz
 
     assert run("clkdiv(50M, 115200)") == "434"
     assert run("clkdiv(100M, 25M)") == "4"
@@ -120,7 +120,7 @@ def test_clkdiv_golden_and_viz() -> None:
 
 
 def test_clkdiv_wave_fields() -> None:
-    from calcutron.engine.viz import ClockViz
+    from radix.engine.viz import ClockViz
 
     def wave(text: str) -> tuple[int | None, int | None, str | None]:
         outcome = Session().evaluate(text)
@@ -137,7 +137,7 @@ def test_clkdiv_wave_fields() -> None:
 
 
 def test_period_freq_attach_clock_viz() -> None:
-    from calcutron.engine.viz import ClockViz
+    from radix.engine.viz import ClockViz
 
     session = Session()
     outcome = session.evaluate("period(100M)")
@@ -154,7 +154,7 @@ def test_period_freq_attach_clock_viz() -> None:
 
 
 def test_mem_golden_and_viz() -> None:
-    from calcutron.engine.viz import MemViz
+    from radix.engine.viz import MemViz
 
     assert run("mem(4096, 36)") == "147456"
     session = Session()
@@ -178,7 +178,7 @@ def test_mem_golden_and_viz() -> None:
 
 
 def test_fix_attaches_viz_payload() -> None:
-    from calcutron.engine.viz import FixedPointViz
+    from radix.engine.viz import FixedPointViz
 
     session = Session()
     outcome = session.evaluate("fix(0.5, 1, 15)")
@@ -207,7 +207,7 @@ def test_fix_range_errors() -> None:
 # -- IEEE-754 ----------------------------------------------------------------------
 
 def test_float_pack_golden_and_viz() -> None:
-    from calcutron.engine.viz import FloatBitsViz
+    from radix.engine.viz import FloatBitsViz
 
     session = Session()
     outcome = session.evaluate("float32(1.5)")
@@ -225,7 +225,7 @@ def test_float_pack_golden_and_viz() -> None:
 
 
 def test_float32_rounds_and_reports_it() -> None:
-    from calcutron.engine.viz import FloatBitsViz
+    from radix.engine.viz import FloatBitsViz
 
     session = Session()
     outcome = session.evaluate("float32(0.1)")
@@ -238,7 +238,7 @@ def test_float32_rounds_and_reports_it() -> None:
 
 
 def test_unfloat_roundtrip_and_subnormal() -> None:
-    from calcutron.engine.viz import FloatBitsViz
+    from radix.engine.viz import FloatBitsViz
 
     assert run("unfloat32(0x3FC00000)") == "1.5"
     assert run("unfloat64(float64(pi))") == "3.14159265359"

@@ -13,15 +13,15 @@ import struct
 
 import mpmath
 
-from calcutron.engine.formatter import float_views, format_si
-from calcutron.engine.functions import (
+from radix.engine.formatter import float_views, format_si
+from radix.engine.functions import (
     EvalContext,
     FunctionDomainError,
     Handler,
     _register,
 )
-from calcutron.engine.values import Number, Value
-from calcutron.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz
+from radix.engine.values import Number, Value
+from radix.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz
 
 MAX_MASK_BITS = 1_000_000
 

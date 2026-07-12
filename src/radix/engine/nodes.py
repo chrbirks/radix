@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from calcutron.engine.errors import Span
-from calcutron.engine.values import Number
+from radix.engine.errors import Span
+from radix.engine.values import Number
 
 
 @dataclass(frozen=True)

@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from calcutron.engine.formatter import format_number
-from calcutron.engine.nodes import (
+from radix.engine.formatter import format_number
+from radix.engine.nodes import (
     Assign,
     Binary,
     Call,
@@ -22,8 +22,8 @@ from calcutron.engine.nodes import (
     Slice,
     Unary,
 )
-from calcutron.engine.parser import BINARY_BP, SLICE_BP, UNARY_BP
-from calcutron.engine.values import Value
+from radix.engine.parser import BINARY_BP, SLICE_BP, UNARY_BP
+from radix.engine.values import Value
 
 _SUPERSCRIPTS = {"0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
                  "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"}

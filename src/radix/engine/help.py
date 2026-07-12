@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from html import escape
 
-from calcutron import __version__
-from calcutron.engine.functions import CONSTANTS, FUNCTIONS
+from radix import __version__
+from radix.engine.functions import CONSTANTS, FUNCTIONS
 
 _OPERATOR_HELP: list[tuple[str, str, str]] = [
     # (operator, summary, example) — lowest to highest precedence
@@ -31,7 +31,7 @@ _OPERATOR_HELP: list[tuple[str, str, str]] = [
 ]
 
 _BASICS = f"""\
-Calcutron-9000 v{__version__}
+Radix v{__version__}
 
 Type an expression and press Enter. Everything is keyboard-first — no buttons.
 

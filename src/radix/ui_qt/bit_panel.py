@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from calcutron.engine.formatter import FloatViews, format_int_base, integer_views
-from calcutron.ui_qt.theme import Palette
+from radix.engine.formatter import FloatViews, format_int_base, integer_views
+from radix.ui_qt.theme import Palette
 
 CELL = 24
 GAP = 4

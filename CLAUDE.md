@@ -1,4 +1,4 @@
-# Calcutron-9000
+# Radix
 
 Keyboard-first scientific + programmer calculator (Python 3.11+, PySide6) for
 engineers, with an FPGA/HDL toolkit. Ships as PyInstaller onedir binaries for
@@ -10,10 +10,10 @@ Windows and Linux. The full design rationale and feature spec live in
 ```sh
 QT_QPA_PLATFORM=offscreen uv run pytest tests/ -q   # all tests (offscreen-safe)
 uv run ruff check src tests                         # lint
-uv run mypy                                         # strict on calcutron.engine.*
-uv run calcutron                                    # launch GUI
-uv run calcutron -e "0xFF << 2"                     # one-shot CLI (no display)
-uv run pyinstaller packaging/calcutron.spec         # frozen build into dist/
+uv run mypy                                         # strict on radix.engine.*
+uv run radix                                        # launch GUI
+uv run radix -e "0xFF << 2"                         # one-shot CLI (no display)
+uv run pyinstaller packaging/radix.spec             # frozen build into dist/
 ```
 
 All three checks must pass before committing. Everything runs through `uv` —
@@ -25,16 +25,16 @@ Pipeline: lexer → Pratt parser → AST → tree-walking evaluator → formatte
 Nothing is ever `eval`ed. All tokens/errors carry source `Span`s for caret
 diagnostics.
 
-- `src/calcutron/engine/` — headless math core (lexer, parser, evaluator,
+- `src/radix/engine/` — headless math core (lexer, parser, evaluator,
   formatter, functions/constants tables, FPGA helpers, help generation).
   `help` text (plain + HTML variants) and the input autocomplete popup are
   generated from the same tables the evaluator dispatches through — extend
   the tables, never hand-write help entries. Every registered function must
   supply `params` (display argument names) and `category`.
-- `src/calcutron/session.py` — `Session` façade owning all state (variables,
+- `src/radix/session.py` — `Session` façade owning all state (variables,
   `ans`, word size, signedness, deg/rad, notation). `evaluate(text,
   commit=False)` is the side-effect-free preview path.
-- `src/calcutron/ui_qt/` — the UI only calls `Session.evaluate` and renders
+- `src/radix/ui_qt/` — the UI only calls `Session.evaluate` and renders
   the result; it never computes math itself.
 - Rich result graphics ride the `Value.viz` channel: engine functions attach
   a frozen payload from `engine/viz.py` (`FixedPointViz`/`ClockViz`/`MemViz` —
@@ -60,7 +60,7 @@ diagnostics.
 - The integer panel's `scratch` stays **unmasked**; mask only at
   display/copy time (`_masked_scratch`) so cycling word size never destroys
   upper bits. The input line always reflects bit-grid edits.
-- Version is single-sourced from `calcutron.__version__` (hatchling dynamic
+- Version is single-sourced from `radix.__version__` (hatchling dynamic
   version); it appears in the window title, help header, and `--version`.
 
 ## Conventions & gotchas
@@ -83,6 +83,10 @@ diagnostics.
   authoritative.
 - No git remote is configured, so CI (including the Windows PyInstaller leg)
   has never run; the frozen build is verified locally on Linux only.
+- The app icon (radical-sign mark, `#2563eb` tile) lives at
+  `src/radix/ui_qt/icons/icon.png` (runtime, via `theme.load_app_icon()`) and
+  `packaging/icon.ico` (PyInstaller `EXE(icon=...)`, Windows/macOS only —
+  ignored with a warning on Linux, which is expected).
 
 ## Working preferences
 

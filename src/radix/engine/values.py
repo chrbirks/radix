@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 import mpmath
 
 if TYPE_CHECKING:
-    from calcutron.engine.viz import VizPayload
+    from radix.engine.viz import VizPayload
 
 # Working precision (decimal digits) for real-number math. Display precision is
 # independent and much lower; see formatter.py.

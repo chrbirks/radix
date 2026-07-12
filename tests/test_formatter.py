@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import mpmath
 
-from calcutron.engine.formatter import format_int_base, format_real, integer_views
-from calcutron.session import Session
+from radix.engine.formatter import format_int_base, format_real, integer_views
+from radix.session import Session
 
 
 def test_notations() -> None:
@@ -47,7 +47,7 @@ def test_integer_views_grouping_and_signedness() -> None:
 
 
 def test_float_views_double() -> None:
-    from calcutron.engine.formatter import float_views
+    from radix.engine.formatter import float_views
 
     views = float_views(1.0, 64)
     assert views is not None
@@ -59,7 +59,7 @@ def test_float_views_double() -> None:
 
 
 def test_float_views_single_and_specials() -> None:
-    from calcutron.engine.formatter import float_views
+    from radix.engine.formatter import float_views
 
     views = float_views(-2.5, 32)
     assert views is not None

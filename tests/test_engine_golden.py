@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from calcutron.engine.errors import CalcError, EvalError, IncompleteError, LexError, ParseError
-from calcutron.session import Session
+from radix.engine.errors import CalcError, EvalError, IncompleteError, LexError, ParseError
+from radix.session import Session
 
 
 def run(text: str, **settings: object) -> str:

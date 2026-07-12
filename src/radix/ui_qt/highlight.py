@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat, QTextDocument
 
-from calcutron.engine.functions import CONSTANTS, FUNCTIONS
-from calcutron.engine.lexer import tokenize_prefix
-from calcutron.ui_qt.theme import Palette
+from radix.engine.functions import CONSTANTS, FUNCTIONS
+from radix.engine.lexer import tokenize_prefix
+from radix.ui_qt.theme import Palette
 
 PARENS = {"(", ")", "[", "]"}
 

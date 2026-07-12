@@ -64,14 +64,14 @@ jobs:
           sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
 
       - name: Freeze with PyInstaller (onedir)
-        run: uv run pyinstaller packaging/calcutron.spec --distpath dist --workpath build --noconfirm
+        run: uv run pyinstaller packaging/radix.spec --distpath dist --workpath build --noconfirm
         # NOTE: keep PySide6 and PyInstaller pinned together (uv.lock); Qt point
         # releases have broken PyInstaller hooks before.
 
       - name: Smoke-test frozen binary (Linux)
         if: runner.os == 'Linux'
         run: |
-          out="$(QT_QPA_PLATFORM=offscreen ./dist/calcutron/calcutron -e '0xFF << 2')"
+          out="$(QT_QPA_PLATFORM=offscreen ./dist/radix/radix -e '0xFF << 2')"
           echo "$out"
           echo "$out" | grep -q '1020'
 
@@ -79,22 +79,22 @@ jobs:
         if: runner.os == 'Windows'
         # The exe is windowed (console=false), so stdout is discarded; the
         # smoke test asserts the exit code.
-        run: ./dist/calcutron/calcutron.exe -e '0xFF << 2'
+        run: ./dist/radix/radix.exe -e '0xFF << 2'
         shell: bash
 
       - name: Package tarball (Linux)
         if: runner.os == 'Linux'
-        run: tar -C dist -czf calcutron-linux-x86_64.tar.gz calcutron
+        run: tar -C dist -czf radix-linux-x86_64.tar.gz radix
 
       - name: Package zip (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path dist/calcutron -DestinationPath calcutron-windows-x86_64.zip
+        run: Compress-Archive -Path dist/radix -DestinationPath radix-windows-x86_64.zip
         shell: pwsh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: calcutron-${{ runner.os }}
+          name: radix-${{ runner.os }}
           path: |
-            calcutron-*.tar.gz
-            calcutron-*.zip
+            radix-*.tar.gz
+            radix-*.zip

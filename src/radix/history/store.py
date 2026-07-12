@@ -27,7 +27,7 @@ class StoredEntry:
 
 
 def default_path() -> Path:
-    return Path(platformdirs.user_data_dir("calcutron", appauthor=False)) / "history.jsonl"
+    return Path(platformdirs.user_data_dir("radix", appauthor=False)) / "history.jsonl"
 
 
 class HistoryStore:

@@ -25,11 +25,11 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
 )
 
-from calcutron.engine.functions import CONSTANTS, FUNCTIONS
-from calcutron.session import Session
-from calcutron.ui_qt.highlight import color_for
-from calcutron.ui_qt.input_edit import InputEdit
-from calcutron.ui_qt.theme import Palette
+from radix.engine.functions import CONSTANTS, FUNCTIONS
+from radix.session import Session
+from radix.ui_qt.highlight import color_for
+from radix.ui_qt.input_edit import InputEdit
+from radix.ui_qt.theme import Palette
 
 MAX_VISIBLE_ROWS = 8
 ITEM_ROLE = Qt.ItemDataRole.UserRole + 1

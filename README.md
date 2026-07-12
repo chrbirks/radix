@@ -1,4 +1,4 @@
-# Calcutron-9000
+# Radix
 
 Keyboard-first scientific + programmer calculator for engineers, built with
 Python and PySide6. Runs on Windows and Linux.
@@ -25,14 +25,14 @@ divided waveform with the output's duty cycle.
 ## Quick start
 
 ```sh
-uv run calcutron                 # GUI
-uv run calcutron -e "0xFF << 2"  # one-shot CLI
-uv run calcutron -e help         # the built-in overview
+uv run radix                 # GUI
+uv run radix -e "0xFF << 2"  # one-shot CLI
+uv run radix -e help         # the built-in overview
 ```
 
 Or grab a standalone build (no Python needed) from CI artifacts: unzip and run
-`calcutron`/`calcutron.exe`. Windows SmartScreen will warn on the unsigned
-binary — this is a known v1 limitation. `calcutron --version` prints the
+`radix`/`radix.exe`. Windows SmartScreen will warn on the unsigned
+binary — this is a known v1 limitation. `radix --version` prints the
 version; release history lives in [CHANGELOG.md](CHANGELOG.md).
 
 ## The language
@@ -106,7 +106,7 @@ as hex/dec/bin, recall it, or delete it.
 
 All settings — word size, signedness, deg/rad, notation, result base,
 always-on-top, window geometry — persist across restarts in a plain INI file
-(`%APPDATA%\calcutron` on Windows, `~/.config/calcutron` on Linux).
+(`%APPDATA%\radix` on Windows, `~/.config/radix` on Linux).
 
 ## Keyboard
 
@@ -135,10 +135,10 @@ live engine.
 uv sync                                   # env + deps (uv.lock is authoritative)
 uv run pytest                             # golden tables, Hypothesis, pytest-qt
 uv run ruff check src tests && uv run mypy
-uv run pyinstaller packaging/calcutron.spec --distpath dist --noconfirm
+uv run pyinstaller packaging/radix.spec --distpath dist --noconfirm
 ```
 
-Architecture: `src/calcutron/engine/` is a headless, UI-agnostic pipeline
+Architecture: `src/radix/engine/` is a headless, UI-agnostic pipeline
 (lexer → Pratt parser → AST → evaluator → formatter; mpmath for reals, exact
 Python ints for integer/bit math — never `eval`). `session.py` owns all state
 and is the only API the UI and CLI call; `Session.evaluate(text, commit=False)`

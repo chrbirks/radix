@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from calcutron.engine.functions import FUNCTIONS
-from calcutron.engine.help import general_help, topic_help
+from radix.engine.functions import FUNCTIONS
+from radix.engine.help import general_help, topic_help
 
 
 def test_general_help_is_categorized_with_signatures() -> None:

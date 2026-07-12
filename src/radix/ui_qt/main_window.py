@@ -25,20 +25,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from calcutron import __version__
-from calcutron.engine.errors import CalcError, IncompleteError
-from calcutron.engine.help import general_help_html
-from calcutron.engine.values import Value
-from calcutron.history.store import HistoryStore, StoredEntry
-from calcutron.session import Session
-from calcutron.ui_qt.bit_panel import IntegerView
-from calcutron.ui_qt.completer import Completer
-from calcutron.ui_qt.highlight import ExprHighlighter
-from calcutron.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
-from calcutron.ui_qt.input_edit import InputEdit
-from calcutron.ui_qt.settings import app_settings, load_session, save_session
-from calcutron.ui_qt.theme import Palette
-from calcutron.ui_qt.viz_panel import VizPanel
+from radix import __version__
+from radix.engine.errors import CalcError, IncompleteError
+from radix.engine.help import general_help_html
+from radix.engine.values import Value
+from radix.history.store import HistoryStore, StoredEntry
+from radix.session import Session
+from radix.ui_qt.bit_panel import IntegerView
+from radix.ui_qt.completer import Completer
+from radix.ui_qt.highlight import ExprHighlighter
+from radix.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
+from radix.ui_qt.input_edit import InputEdit
+from radix.ui_qt.settings import app_settings, load_session, save_session
+from radix.ui_qt.theme import Palette
+from radix.ui_qt.viz_panel import VizPanel
 
 PREVIEW_DEBOUNCE_MS = 100
 
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
         self.recall_index: int | None = None
         self.last_result_text = ""
 
-        self.setWindowTitle(f"Calcutron-9000 v{__version__}")
+        self.setWindowTitle(f"Radix v{__version__}")
         self.setMinimumSize(520, 600)
 
         root = QWidget()

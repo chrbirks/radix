@@ -31,8 +31,8 @@ from fractions import Fraction
 
 import mpmath
 
-from calcutron.engine.errors import LexError, Span
-from calcutron.engine.values import Number
+from radix.engine.errors import LexError, Span
+from radix.engine.values import Number
 
 SI_SUFFIXES: dict[str, int] = {
     "f": -15,

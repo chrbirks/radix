@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib import resources
 
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtGui import QFontDatabase, QIcon, QPixmap
 from PySide6.QtWidgets import QApplication
 
 
@@ -82,13 +82,23 @@ def load_bundled_font() -> str:
     """Register the bundled monospace font; fall back to the system fixed font."""
     loaded = False
     for name in ("JetBrainsMono-Regular.ttf", "JetBrainsMono-Bold.ttf"):
-        ref = resources.files("calcutron.ui_qt") / "fonts" / name
+        ref = resources.files("radix.ui_qt") / "fonts" / name
         with resources.as_file(ref) as path:
             if QFontDatabase.addApplicationFont(str(path)) >= 0:
                 loaded = True
     if loaded:
         return MONO_FAMILY
     return QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+
+
+def load_app_icon() -> QIcon:
+    """Load the bundled app icon (radical-sign mark on the accent-blue tile)."""
+    ref = resources.files("radix.ui_qt") / "icons" / "icon.png"
+    with resources.as_file(ref) as path:
+        # Read pixel data now, inside the context — `path` may point at a
+        # temp-extracted file that as_file removes once the block exits.
+        pixmap = QPixmap(str(path))
+    return QIcon(pixmap)
 
 
 def stylesheet(p: Palette, mono: str) -> str:

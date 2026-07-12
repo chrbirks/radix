@@ -8,9 +8,9 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt  # noqa: E402
 
-from calcutron.session import Session  # noqa: E402
-from calcutron.ui_qt.main_window import MainWindow  # noqa: E402
-from calcutron.ui_qt.theme import LIGHT  # noqa: E402
+from radix.session import Session  # noqa: E402
+from radix.ui_qt.main_window import MainWindow  # noqa: E402
+from radix.ui_qt.theme import LIGHT  # noqa: E402
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def test_preview_error_underlines_span(qtbot, window: MainWindow) -> None:  # ty
 
 
 def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from calcutron.engine.viz import FixedPointViz
+    from radix.engine.viz import FixedPointViz
 
     _submit(qtbot, window, "fix(0.7071, 1, 15)")
     assert window.vizpanel.isVisibleTo(window)
@@ -109,7 +109,7 @@ def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWin
 
 
 def test_viz_panel_clock_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from calcutron.engine.viz import ClockViz
+    from radix.engine.viz import ClockViz
 
     _submit(qtbot, window, "clkdiv(50M, 115200)")
     assert window.vizpanel.isVisibleTo(window)
@@ -123,7 +123,7 @@ def test_viz_panel_clock_card(qtbot, window: MainWindow) -> None:  # type: ignor
 
 
 def test_viz_panel_clock_wave_heights(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from calcutron.ui_qt.viz_panel import LINE_H, WAVE_STRIP_H
+    from radix.ui_qt.viz_panel import LINE_H, WAVE_STRIP_H
 
     _submit(qtbot, window, "clkdiv(96M, 12M)")  # divisor 8: waveform drawn
     assert window.vizpanel.height() == 8 + 2 * LINE_H + WAVE_STRIP_H + 10
@@ -132,7 +132,7 @@ def test_viz_panel_clock_wave_heights(qtbot, window: MainWindow) -> None:  # typ
 
 
 def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from calcutron.engine.viz import MemViz
+    from radix.engine.viz import MemViz
 
     _submit(qtbot, window, "mem(3000, 8)")
     assert window.vizpanel.isVisibleTo(window)
@@ -142,8 +142,8 @@ def test_viz_panel_mem_card(qtbot, window: MainWindow) -> None:  # type: ignore[
 
 
 def test_viz_panel_float_card(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from calcutron.engine.viz import FloatBitsViz
-    from calcutron.ui_qt.viz_panel import BAR_H, LINE_H
+    from radix.engine.viz import FloatBitsViz
+    from radix.ui_qt.viz_panel import BAR_H, LINE_H
 
     _submit(qtbot, window, "float32(1.5)")
     assert window.vizpanel.isVisibleTo(window)
@@ -176,7 +176,7 @@ def test_history_context_actions(qtbot, window: MainWindow) -> None:  # type: ig
 def test_history_delete_rewrites_store(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 
-    from calcutron.history.store import HistoryStore
+    from radix.history.store import HistoryStore
 
     QSettings.setPath(
         QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path / "settings")
@@ -465,7 +465,7 @@ def test_panel_follows_input_live(qtbot, window: MainWindow) -> None:  # type: i
 def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 
-    from calcutron.history.store import HistoryStore
+    from radix.history.store import HistoryStore
 
     # Redirect the INI file into the sandbox so the test never touches the
     # user's real settings.
@@ -498,7 +498,7 @@ def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
 
 
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    from calcutron.ui_qt.bit_panel import BYTE_WIDTH
+    from radix.ui_qt.bit_panel import BYTE_WIDTH
 
     grid = window.intview.grid_widget
     narrow = BYTE_WIDTH + 12  # fits exactly one byte group per row

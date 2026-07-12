@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from calcutron.engine import evaluator, render
-from calcutron.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
-from calcutron.engine import help as help_mod
-from calcutron.engine.errors import CalcError, EvalError, Span
-from calcutron.engine.formatter import (
+from radix.engine import evaluator, render
+from radix.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
+from radix.engine import help as help_mod
+from radix.engine.errors import CalcError, EvalError, Span
+from radix.engine.formatter import (
     FloatViews,
     IntegerViews,
     float_views,
@@ -22,10 +22,10 @@ from calcutron.engine.formatter import (
     format_number,
     integer_views,
 )
-from calcutron.engine.functions import CONSTANTS, FUNCTIONS, EvalContext
-from calcutron.engine.nodes import Assign
-from calcutron.engine.parser import parse
-from calcutron.engine.values import Value
+from radix.engine.functions import CONSTANTS, FUNCTIONS, EvalContext
+from radix.engine.nodes import Assign
+from radix.engine.parser import parse
+from radix.engine.values import Value
 
 WORD_SIZES = (8, 16, 32, 64)
 NOTATIONS = ("auto", "sci", "eng", "eng_si")

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import mpmath
 
-from calcutron.engine.values import Number, Value
+from radix.engine.values import Number, Value
 
 DISPLAY_DIGITS = 12
 # Plain notation is used in auto mode when the decimal exponent is in this range.
