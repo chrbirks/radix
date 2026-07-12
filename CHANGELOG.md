@@ -17,7 +17,14 @@ ambiguity to resolve about major/minor/patch.
   id, not from the in-process `QIcon`. The app now reports its desktop-file
   id (`QApplication.setDesktopFileName`), and a `radix.desktop` plus
   `hicolor`-theme icon set (16 through 256px) ship alongside it — see the
-  README for the one-time install step the frozen build needs.
+  README for the one-time install step the frozen build needs. Two gotchas
+  discovered getting this working: the install location is `$XDG_DATA_HOME`,
+  which isn't always `~/.local/share` (some setups remap it — check
+  `echo $XDG_DATA_HOME`); and the desktop file's `Exec=` must actually
+  resolve (`PATH` or an absolute path), because GLib silently refuses to
+  parse the whole entry otherwise — an unresolvable `Exec=` makes GNOME
+  Shell unable to see the file at all, which looks identical to the
+  original bug.
 
 ## [2] - 2026-07-12
 

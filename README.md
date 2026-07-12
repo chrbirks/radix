@@ -38,12 +38,19 @@ version; release history lives in [CHANGELOG.md](CHANGELOG.md).
 On Linux, Wayland compositors (GNOME Shell in particular) show the running
 app's real icon only if a matching `.desktop` file is installed — otherwise
 you get the generic executable icon. `uv run radix` and the frozen binary
-both already report the right desktop-file id; you just need the file itself
-in place once: copy `_internal/radix.desktop` to
-`~/.local/share/applications/` (fixing its `Exec=` line to point at your
-`radix` binary if it's not on `PATH`) and `_internal/icons/hicolor/*` into
-`~/.local/share/icons/hicolor/`, then log out/in or run
-`update-desktop-database ~/.local/share/applications`.
+both already report the right desktop-file id; you need the file itself in
+place once: copy `_internal/radix.desktop` to
+`$XDG_DATA_HOME/applications/` (defaults to `~/.local/share/applications/` —
+check `echo $XDG_DATA_HOME` if you're not sure, some setups override it) and
+`_internal/icons/hicolor/*` into `$XDG_DATA_HOME/icons/hicolor/`.
+**Its `Exec=radix` line must resolve** — either put the `radix` binary on
+your `PATH` (e.g. symlink it into `~/.local/bin/`) or edit that line to an
+absolute path. This isn't just about being able to launch it from the file:
+GLib refuses to even parse a desktop entry whose `Exec=` doesn't resolve, so
+a bad `Exec=` makes the file invisible to GNOME Shell entirely, not just
+unlaunchable — which is exactly the same "generic icon" symptom as not
+having the file at all. Then `update-desktop-database` on that applications
+directory (no logout needed).
 
 ## The language
 

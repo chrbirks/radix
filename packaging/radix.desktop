@@ -2,8 +2,12 @@
 Type=Application
 Name=Radix
 Comment=Keyboard-first scientific + programmer calculator for engineers
+# Exec must resolve (PATH or absolute path) or GLib silently refuses to
+# parse this whole file — GNOME Shell then can't match a running window to
+# it at all, not just fail to launch it. Put radix on PATH (e.g. symlink
+# into ~/.local/bin/) or replace this with an absolute path. See README.
 Exec=radix
 Icon=radix
 Terminal=false
-Categories=Utility;Calculator;Development;
+Categories=Utility;Calculator;
 StartupWMClass=radix
