@@ -1,6 +1,6 @@
 # Radix UI redesign — "Bench instrument" (execution plan)
 
-Status: **in progress** (WP1-WP8 done). This document is self-contained: an executor (human or LLM) with no
+Status: **complete** (WP1-WP9 done). This document is self-contained: an executor (human or LLM) with no
 prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints are law;
 the non-negotiable ones are repeated in §3 because violating them causes segfaults or data
 loss, not style nits.
@@ -17,8 +17,10 @@ loss, not style nits.
 - Verify each WP **visually**: render offscreen screenshots (script pattern in §7) and
   actually inspect them. Do not trust geometry math alone.
 - Commit after each completed WP (short imperative subject, e.g. `Add instrument-screen
-  design tokens`). Do not push (no remote). Tick the WP's checkbox in this file in the same
-  commit so progress survives across sessions.
+  design tokens`). Do not push without the user's explicit go-ahead (an `origin` remote is
+  configured, but push is a shared-state action — always confirm first, regardless of what
+  CLAUDE.md's "no remote configured" note said when it was written). Tick the WP's checkbox
+  in this file in the same commit so progress survives across sessions.
 - Everything runs through `uv` — never pip or bare `python`.
 
 Progress:
@@ -31,7 +33,7 @@ Progress:
 - [x] WP6 — Mode chips
 - [x] WP7 — Viz cards + timing diagram
 - [x] WP8 — Input row + help/vars polish
-- [ ] WP9 — Final sweep (screenshot matrix, CHANGELOG)
+- [x] WP9 — Final sweep (screenshot matrix, CHANGELOG)
 
 ## 1. Context
 

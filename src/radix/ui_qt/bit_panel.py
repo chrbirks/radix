@@ -98,7 +98,7 @@ class BitGrid(QWidget):
         count = 0
         for row in range(self._rows()):
             hi_bit = self.word_size - 1 - row * per_row
-            lo_bit = self.word_size - (row + 1) * per_row
+            lo_bit = max(0, self.word_size - (row + 1) * per_row)
             row_mask = ((1 << (hi_bit - lo_bit + 1)) - 1) << lo_bit
             if (self.value & row_mask) or (self.changed & row_mask):
                 break

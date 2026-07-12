@@ -9,6 +9,34 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned the UI around a "bench instrument" visual direction (precision
+  test equipment / waveform viewer) instead of the generic dark-IDE look:
+  a two-channel "instrument screen" dark palette (blue = interaction,
+  phosphor green = data trace, amber = measurement cursor) and a
+  "datasheet" light palette, paired with a silkscreen label face
+  (IBM Plex Sans Condensed SemiBold) alongside the JetBrains Mono readout.
+- The window now adapts to its width: a single column below 900px, and a
+  splitter (history/help/vars | inspector) above it, with the input bar
+  spanning the full width underneath either way.
+- The register view's bit grid folds leading all-zero rows behind a
+  collapsed rail (click it, or Alt+E, to expand) instead of always
+  showing every row of a 64-bit word.
+- The integer panel's base rows are now generic lanes: HEX/DEC (merged
+  signed reading when it differs from unsigned)/ASC (hidden when nothing
+  is printable) in integer mode, HEX/SGN/EXP/MAN in float mode. The BIN
+  text row is gone — the bit grid already is the binary rendering.
+- History renders as a ledger: assignments show a chip with the variable
+  name instead of inline `x ← ` text, and integer results get a
+  right-aligned alt-base chip showing whichever of hex/dec isn't the
+  current display base.
+- Status-bar mode indicators are now real chip buttons instead of
+  plain clickable text.
+- The clkdiv clock card's waveform is a proper timing diagram: hairline
+  baselines, sharp rising-edge ticks, and the divided row labeled by its
+  actual achieved frequency.
+
 ### Fixed
 
 - On Linux/Wayland (GNOME Shell in particular), the running app showed the
