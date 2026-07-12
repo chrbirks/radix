@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-12
+
 ### Added
 
 - The clkdiv clock card now draws the reference vs divided clock waveform
@@ -32,11 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   utilities, clock & units, fixed-point, …) with the signature and summary
   of every function; `help <name>` shows real argument names. The GUI help
   pane renders it as an aligned table.
-
 - Integer result display base (dec/hex/bin) for the history pane and the
   live preview — cycle via the status-bar item or Alt+B. Existing history
   entries re-render in the chosen base; float results are unaffected.
-
 - History re-renders when the notation changes (floats included), not just
   on display-base changes.
 - The notation setting (sci/eng/eng·si) now applies to integer results too:
@@ -46,7 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notation, result base, always-on-top, and window size/position. Stored as
   a plain INI file (`AppData` on Windows, `~/.config` on Linux) via
   QSettings.
-
 - New `clkdiv(f_clk, f_target)` toolkit function: nearest integer divider
   with the achieved rate and signed error (ppm, or % past 1%). The viz panel
   shows the clock card — reference freq/period, `/ N → achieved (target)`,
@@ -87,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drifted off-target because the preview and input use different font sizes.
 - Window size was saved on close but never actually restored (the startup
   default overrode it).
+- The autocomplete popup could deactivate the main window or fail to
+  position itself on some window managers (Wayland in particular) because
+  it was a top-level Tool window; it's now a plain child widget raised over
+  the input, which sidesteps window-manager focus/positioning entirely.
 
 ### Removed
 
