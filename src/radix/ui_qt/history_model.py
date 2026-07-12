@@ -2,9 +2,7 @@
 
 Two lines per entry (three with a note): a muted syntax-colored
 `> expression`, then the result. An assignment paints a rounded chip with
-the variable name instead of the `x ← ` prefix text; an integer result
-gets a right-aligned alt-base chip (the dec/hex reading `session.int_base`
-isn't currently showing) so the other base is visible without cycling it.
+the variable name instead of the `x ← ` prefix text.
 """
 
 from __future__ import annotations
@@ -31,16 +29,13 @@ from radix.ui_qt.theme import Palette
 EXPRESSION_ROLE = Qt.ItemDataRole.UserRole + 1
 RESULT_ROLE = Qt.ItemDataRole.UserRole + 2
 NOTE_ROLE = Qt.ItemDataRole.UserRole + 3
-VALUE_ROLE = Qt.ItemDataRole.UserRole + 4
-PREFIX_ROLE = Qt.ItemDataRole.UserRole + 5
+PREFIX_ROLE = Qt.ItemDataRole.UserRole + 4
 
 ROW_PAD_H = 8
 ROW_PAD_V = 4
 LINE_GAP = 2
 BADGE_PAD_H = 6
 BADGE_GAP = 8
-ALT_CHIP_MAX_W = 90
-ALT_CHIP_GAP = 10
 
 
 @dataclass(frozen=True)
@@ -74,8 +69,6 @@ class HistoryModel(QAbstractListModel):
             return entry.result
         if role == NOTE_ROLE:
             return entry.note
-        if role == VALUE_ROLE:
-            return entry.value
         if role == PREFIX_ROLE:
             return entry.prefix
         return None
@@ -122,12 +115,11 @@ def _scaled(base: QFont, factor: float) -> QFont:
 
 
 class HistoryDelegate(QStyledItemDelegate):
-    """`> expression` muted, then the result — assignment badge + alt-base chip."""
+    """`> expression` muted, then the result with its assignment badge."""
 
-    def __init__(self, palette: Palette, alt_base: Callable[[Value], str | None]) -> None:
+    def __init__(self, palette: Palette) -> None:
         super().__init__()
         self.palette_tokens = palette
-        self.alt_base = alt_base  # closure over Session; no math happens in here
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
@@ -144,7 +136,6 @@ class HistoryDelegate(QStyledItemDelegate):
         result = index.data(RESULT_ROLE) or ""
         note = index.data(NOTE_ROLE) or ""
         prefix = index.data(PREFIX_ROLE) or ""
-        value = index.data(VALUE_ROLE)
         p = self.palette_tokens
 
         expr_font = _scaled(option.font, 0.9)
@@ -178,34 +169,13 @@ class HistoryDelegate(QStyledItemDelegate):
             x += badge_w + BADGE_GAP
             display_result = result[len(prefix) :]
 
-        alt_text = self.alt_base(value) if value is not None else None
-        avail_w = result_rect.right() - x
-        if alt_text:
-            avail_w -= ALT_CHIP_MAX_W + ALT_CHIP_GAP
-
         painter.setFont(result_font)
         painter.setPen(QColor(p.text))
         painter.drawText(
-            QRect(x, result_rect.top(), max(0, avail_w), result_rect.height()),
+            QRect(x, result_rect.top(), max(0, result_rect.right() - x), result_rect.height()),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             display_result,
         )
-
-        if alt_text:
-            painter.setFont(note_font)
-            painter.setPen(QColor(p.muted))
-            alt_rect = QRect(
-                result_rect.right() - ALT_CHIP_MAX_W,
-                result_rect.top(),
-                ALT_CHIP_MAX_W,
-                result_rect.height(),
-            )
-            elided = QFontMetrics(note_font).elidedText(
-                alt_text, Qt.TextElideMode.ElideRight, ALT_CHIP_MAX_W
-            )
-            painter.drawText(
-                alt_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, elided
-            )
 
         if note:
             y += result_h + LINE_GAP

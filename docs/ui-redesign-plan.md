@@ -14,6 +14,14 @@ text still uses the canonical `_`-grouped format. Test renamed
 `test_bin_lane_highlights_set_bits_but_copies_plain`. Leave the WP3 write-up below as history of
 why it was removed the first time — don't re-delete BIN citing it.
 
+**Post-completion follow-up (2026-07-12, later):** WP5's right-aligned alt-base chip in the
+history ledger (whichever of hex/dec `session.int_base` wasn't currently showing) was removed at
+the user's request — redundant with the inspector's own HEX/DEC/BIN/ASC lanes below it. Deleted
+`HistoryDelegate.alt_base`, `VALUE_ROLE`, `ALT_CHIP_MAX_W`/`ALT_CHIP_GAP`, and
+`MainWindow._alt_base` entirely (no dead code left). History entries are now just the assignment
+badge + result, nothing right-aligned. Don't re-add an alt-base readout to history citing WP5;
+that call is reversed.
+
 ## How to execute this plan
 
 - Work packages WP1–WP9 are **ordered**; do them one at a time, in order.

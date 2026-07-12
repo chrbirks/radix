@@ -30,9 +30,7 @@ ambiguity to resolve about major/minor/patch.
   grid's asserted cells, and the row wraps instead of overflowing the
   panel at 64-bit word sizes.
 - History renders as a ledger: assignments show a chip with the variable
-  name instead of inline `x ← ` text, and integer results get a
-  right-aligned alt-base chip showing whichever of hex/dec isn't the
-  current display base.
+  name instead of inline `x ← ` text.
 - Status-bar mode indicators are now real chip buttons instead of
   plain clickable text.
 - The clkdiv clock card's waveform is a proper timing diagram: hairline
