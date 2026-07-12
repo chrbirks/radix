@@ -39,6 +39,9 @@ ambiguity to resolve about major/minor/patch.
 - All UI text is two sizes larger for readability (11-20px scale raised to
   13-22px). The clock card's waveform label column was widened so its
   "T = …s" / achieved-frequency labels don't clip at the larger size.
+- The bit grid no longer outlines individual flipped bits in amber — the
+  `Δ +n -m` gained/lost note next to "-> input" already says the same
+  thing as text.
 
 ### Fixed
 
