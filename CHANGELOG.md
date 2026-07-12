@@ -9,6 +9,16 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Fixed
+
+- On Linux/Wayland (GNOME Shell in particular), the running app showed the
+  generic executable icon instead of the Radix mark — Wayland compositors
+  resolve a window's icon from an installed `.desktop` file matched by app
+  id, not from the in-process `QIcon`. The app now reports its desktop-file
+  id (`QApplication.setDesktopFileName`), and a `radix.desktop` plus
+  `hicolor`-theme icon set (16 through 256px) ship alongside it — see the
+  README for the one-time install step the frozen build needs.
+
 ## [2] - 2026-07-12
 
 ### Added

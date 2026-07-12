@@ -35,6 +35,16 @@ Or grab a standalone build (no Python needed) from CI artifacts: unzip and run
 binary — this is a known v1 limitation. `radix --version` prints the
 version; release history lives in [CHANGELOG.md](CHANGELOG.md).
 
+On Linux, Wayland compositors (GNOME Shell in particular) show the running
+app's real icon only if a matching `.desktop` file is installed — otherwise
+you get the generic executable icon. `uv run radix` and the frozen binary
+both already report the right desktop-file id; you just need the file itself
+in place once: copy `_internal/radix.desktop` to
+`~/.local/share/applications/` (fixing its `Exec=` line to point at your
+`radix` binary if it's not on `PATH`) and `_internal/icons/hicolor/*` into
+`~/.local/share/icons/hicolor/`, then log out/in or run
+`update-desktop-database ~/.local/share/applications`.
+
 ## The language
 
 ```

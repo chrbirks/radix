@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Radix
+Comment=Keyboard-first scientific + programmer calculator for engineers
+Exec=radix
+Icon=radix
+Terminal=false
+Categories=Utility;Calculator;Development;
+StartupWMClass=radix

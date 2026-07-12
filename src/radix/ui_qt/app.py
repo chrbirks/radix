@@ -20,6 +20,11 @@ def run_gui(session: Session) -> int:
     app.setApplicationVersion(__version__)
     app.setStyle("Fusion")
     app.setWindowIcon(theme.load_app_icon())
+    # Wayland compositors (GNOME Shell in particular) resolve a running
+    # window's icon by matching this desktop-file id against an installed
+    # radix.desktop's Icon= key — they ignore the QIcon above entirely.
+    # See packaging/radix.desktop.
+    app.setDesktopFileName("radix")
 
     mono = theme.load_bundled_font()
 

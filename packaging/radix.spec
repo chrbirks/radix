@@ -36,6 +36,12 @@ a = Analysis(
     datas=[
         ("../src/radix/ui_qt/fonts", "radix/ui_qt/fonts"),
         ("../src/radix/ui_qt/icons", "radix/ui_qt/icons"),
+        # Linux desktop integration (unused on Windows, harmless to include):
+        # copy these into ~/.local/share/{applications,icons/hicolor} so
+        # Wayland compositors resolve the app's icon by desktop-file id
+        # instead of showing the generic executable icon. See README.
+        ("radix.desktop", "."),
+        ("icons/hicolor", "icons/hicolor"),
     ],
     hiddenimports=[],
     excludes=["tkinter", "test", "unittest", "pydoc_data", *EXCLUDED_QT],

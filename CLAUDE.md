@@ -88,6 +88,15 @@ diagnostics.
   `src/radix/ui_qt/icons/icon.png` (runtime, via `theme.load_app_icon()`) and
   `packaging/icon.ico` (PyInstaller `EXE(icon=...)`, Windows/macOS only —
   ignored with a warning on Linux, which is expected).
+- On Wayland (GNOME Shell), `QApplication.setWindowIcon()` alone is not
+  enough — the compositor looks up the icon via the window's desktop-file id
+  matched against an *installed* `.desktop` file, ignoring in-process
+  `QIcon`s. That's what `app.setDesktopFileName("radix")` (`ui_qt/app.py`)
+  plus the shipped `packaging/radix.desktop` and
+  `packaging/icons/hicolor/*/apps/radix.png` are for; see README for the
+  install step. Don't "fix" a missing/wrong taskbar icon by touching
+  `theme.load_app_icon()` again — that path already works, this is a
+  separate Linux desktop-integration concern.
 
 ## Working preferences
 
