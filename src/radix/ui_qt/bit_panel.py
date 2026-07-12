@@ -35,6 +35,8 @@ BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble ga
 LANE_ROWS = 4  # max simultaneous lanes (HEX/DEC/BIN/ASC, or HEX/SGN/EXP/MAN)
 RAIL_H = 22  # collapsed / collapse-affordance strip height
 COLLAPSE_THRESHOLD_ROWS = 2  # only worth collapsing when >=2 full rows are all-zero
+TOP_MARGIN = 8  # above the first row, so tall hex-digit labels don't clip the widget edge
+BOTTOM_MARGIN = 4
 
 
 class BitGrid(QWidget):
@@ -119,7 +121,7 @@ class BitGrid(QWidget):
         return self._leading_zero_rows()
 
     def _rail_rect(self) -> QRectF:
-        return QRectF(4, 4, max(0, self.width() - 8), RAIL_H - 4)
+        return QRectF(4, TOP_MARGIN, max(0, self.width() - 8), RAIL_H - 4)
 
     def _field_of(self, bit: int) -> str:
         """"sign" / "exponent" / "mantissa" for a bit in float mode."""
@@ -147,7 +149,9 @@ class BitGrid(QWidget):
 
     def _apply_height(self) -> None:
         visible_rows = self._rows() - self._hidden_rows()
-        self.setMinimumHeight(visible_rows * ROW_H + self._rail_extra() + 8)
+        self.setMinimumHeight(
+            visible_rows * ROW_H + self._rail_extra() + TOP_MARGIN + BOTTOM_MARGIN
+        )
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         self._apply_height()
@@ -169,12 +173,14 @@ class BitGrid(QWidget):
         visible_row = row - hidden
         nibble_gaps = col // 4
         x = 4 + col * (CELL + GAP) + nibble_gaps * NIBBLE_GAP
-        y = 4 + self._rail_extra() + visible_row * ROW_H + HEX_H
+        y = TOP_MARGIN + self._rail_extra() + visible_row * ROW_H + HEX_H
         return QRectF(x, y, CELL, CELL)
 
     def sizeHint(self) -> QSize:
         visible_rows = self._rows() - self._hidden_rows()
-        return QSize(2 * BYTE_WIDTH, visible_rows * ROW_H + self._rail_extra() + 8)
+        return QSize(
+            2 * BYTE_WIDTH, visible_rows * ROW_H + self._rail_extra() + TOP_MARGIN + BOTTOM_MARGIN
+        )
 
     def _paint_rail(self, painter: QPainter) -> None:
         p = self.palette_tokens
