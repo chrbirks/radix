@@ -340,9 +340,12 @@ def test_ascii_row(qtbot, window: MainWindow) -> None:  # type: ignore[no-untype
     assert "ASC" not in window.intview.rows
 
 
-def test_bin_lane_removed_and_ascii_lane_hides(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+def test_bin_lane_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.session.word_size = 8
     _submit(qtbot, window, "0b1010")
-    assert "BIN" not in window.intview.rows  # the grid is the binary rendering now
+    bin_text = window.intview.rows["BIN"][1].text()
+    assert "<span" in bin_text  # set bits colored, but...
+    assert window.intview._copy_texts["BIN"] == "0b0000_1010"  # ...copy is plain text
     _submit(qtbot, window, "0xFFFF")
     assert "ASC" not in window.intview.rows
     _submit(qtbot, window, "0x746F6B31")

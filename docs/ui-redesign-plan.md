@@ -5,6 +5,15 @@ prior context can implement it. Read the repo's `CLAUDE.md` first — its constr
 the non-negotiable ones are repeated in §3 because violating them causes segfaults or data
 loss, not style nits.
 
+**Post-completion follow-up (2026-07-12):** WP3's "delete the BIN row" call (§ below, and the
+`test_bin_lane_removed_and_ascii_lane_hides` test) was reversed at the user's request — BIN is
+back as a fourth integer-mode lane (`HEX/DEC/BIN/ASC`), set bits highlighted in the grid's
+phosphor color, displayed with space-separated nibble groups so the label word-wraps instead of
+overflowing at 64-bit (the original truncation problem this WP was trying to fix); the copied
+text still uses the canonical `_`-grouped format. Test renamed
+`test_bin_lane_highlights_set_bits_but_copies_plain`. Leave the WP3 write-up below as history of
+why it was removed the first time — don't re-delete BIN citing it.
+
 ## How to execute this plan
 
 - Work packages WP1–WP9 are **ordered**; do them one at a time, in order.

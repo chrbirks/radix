@@ -24,9 +24,11 @@ ambiguity to resolve about major/minor/patch.
   collapsed rail (click it, or Alt+E, to expand) instead of always
   showing every row of a 64-bit word.
 - The integer panel's base rows are now generic lanes: HEX/DEC (merged
-  signed reading when it differs from unsigned)/ASC (hidden when nothing
-  is printable) in integer mode, HEX/SGN/EXP/MAN in float mode. The BIN
-  text row is gone — the bit grid already is the binary rendering.
+  signed reading when it differs from unsigned)/BIN/ASC (hidden when
+  nothing is printable) in integer mode, HEX/SGN/EXP/MAN in float mode.
+  BIN's set bits are highlighted in the same phosphor color as the bit
+  grid's asserted cells, and the row wraps instead of overflowing the
+  panel at 64-bit word sizes.
 - History renders as a ledger: assignments show a chip with the variable
   name instead of inline `x ← ` text, and integer results get a
   right-aligned alt-base chip showing whichever of hex/dec isn't the

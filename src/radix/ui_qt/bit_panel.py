@@ -32,7 +32,7 @@ HEX_H = 18  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
-LANE_ROWS = 4  # max simultaneous lanes: integer mode uses <=3, float mode uses 4
+LANE_ROWS = 4  # max simultaneous lanes (HEX/DEC/BIN/ASC, or HEX/SGN/EXP/MAN)
 RAIL_H = 22  # collapsed / collapse-affordance strip height
 COLLAPSE_THRESHOLD_ROWS = 2  # only worth collapsing when >=2 full rows are all-zero
 
@@ -368,6 +368,7 @@ class IntegerView(QWidget):
             value = QLabel("")
             value.setProperty("class", "laneValue")
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            value.setWordWrap(True)  # BIN at 64-bit is ~80 chars wide; wrap at nibble gaps
             copy_btn = QPushButton("copy")
             copy_btn.setProperty("class", "copyBtn")
             copy_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -492,11 +493,26 @@ class IntegerView(QWidget):
         dec_text = views.dec_unsigned
         if views.dec_signed != views.dec_unsigned:
             dec_text = f"{views.dec_unsigned}  ({views.dec_signed})"
-        self._copy_texts = {"HEX": views.hex, "DEC": views.dec_unsigned, "ASC": views.ascii}
+        self._copy_texts = {
+            "HEX": views.hex,
+            "DEC": views.dec_unsigned,
+            "BIN": views.binary,
+            "ASC": views.ascii,
+        }
         placeholder = "—"
+        # Set bits rendered in the same phosphor/trace color as the bit grid's
+        # asserted cells, so the two views read as one instrument, not two.
+        # Displayed with space-separated nibble groups (copy keeps the
+        # canonical "_" grouping) so QLabel can wrap the line at 64-bit
+        # word sizes instead of overflowing the panel.
+        bin_display = views.binary.replace("_", " ")
+        bin_text = bin_display.replace(
+            "1", f'<span style="color:{self.palette_tokens.bit_on}">1</span>'
+        )
         lanes = [
             ("HEX", views.hex if self.active else placeholder),
             ("DEC", dec_text if self.active else placeholder),
+            ("BIN", bin_text if self.active else placeholder),
         ]
         if any(ch != "." for ch in views.ascii):
             lanes.append(("ASC", views.ascii if self.active else placeholder))
