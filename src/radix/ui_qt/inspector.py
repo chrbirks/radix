@@ -24,6 +24,7 @@ class Inspector(QWidget):
         self.trace_caption = ZoneCaption("TRACE")
         self.trace_caption.set_palette(palette)
         self.vizpanel = VizPanel(palette)
+        self.trace_caption.hide()
         self.intview = IntegerView(palette, clipboard_setter)
 
         layout = QVBoxLayout(self)

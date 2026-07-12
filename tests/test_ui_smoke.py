@@ -130,6 +130,10 @@ def test_trace_caption_visibility_tracks_vizpanel(qtbot, window: MainWindow) -> 
     assert window.inspector.trace_caption.isVisibleTo(window)
 
 
+def test_trace_caption_hidden_on_launch(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert not window.inspector.trace_caption.isVisibleTo(window.inspector)
+
+
 def test_zone_caption_heights_match_constant(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from radix.ui_qt.zones import ZONE_CAPTION_H
 
