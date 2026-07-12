@@ -231,15 +231,6 @@ class BitGrid(QWidget):
             painter.setPen(QPen(QColor(p.text), 1.5))
             for bit in range(lo, min(hi, self.word_size - 1) + 1):
                 painter.drawRoundedRect(self._cell_rect(bit).adjusted(-1, -1, 1, 1), 3, 3)
-        # Outline the bits that flipped vs. the previous value.
-        if self.enabled_look and self.changed:
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(QColor(self.palette_tokens.bit_changed), 2))
-            for bit in range(self.word_size):
-                if (self.changed >> bit) & 1:
-                    rect = self._cell_rect(bit)
-                    if not rect.isEmpty():
-                        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 2, 2)
         label_font = painter.font()
         label_font.setPixelSize(16)
         painter.setFont(label_font)
