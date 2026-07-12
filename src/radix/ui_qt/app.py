@@ -26,11 +26,11 @@ def run_gui(session: Session) -> int:
     # See packaging/radix.desktop.
     app.setDesktopFileName("radix")
 
-    mono = theme.load_bundled_font()
+    mono, label = theme.load_bundled_font()
 
     def apply_theme() -> None:
         palette = theme.current_palette(app)
-        app.setStyleSheet(theme.stylesheet(palette, mono))
+        app.setStyleSheet(theme.stylesheet(palette, mono, label))
         window.apply_palette(palette)
 
     window = MainWindow(session, theme.current_palette(app), store=HistoryStore())

@@ -3,6 +3,14 @@
 One palette definition per scheme; the QSS is a template over the tokens so
 light and dark can never drift structurally. The app follows the OS color
 scheme via QStyleHints.colorScheme and re-applies on change.
+
+Color is split by meaning, not by widget, like a scope separates chrome from
+trace from cursor: `accent` (interaction: focus, selection, caret, chip
+hover) is never used to render data, `bit_on`/`ok` (data trace / healthy
+status) and `bit_changed`/`warn` (measurement cursor / attention) carry the
+other two channels. `error` stands alone. Typography pairs a readout face
+(JetBrains Mono, every number and expression) with a silkscreen face (IBM
+Plex Sans Condensed SemiBold, uppercase micro-labels only).
 """
 
 from __future__ import annotations
@@ -16,18 +24,23 @@ from PySide6.QtWidgets import QApplication
 
 @dataclass(frozen=True)
 class Palette:
-    background: str
-    surface: str  # input field, panels
+    background: str  # chassis
+    surface: str  # raised controls: input, popups, dropdowns
+    surface_sunken: str  # recessed "screen": viz panel, integer/register view
     text: str
     muted: str  # preview line, separators text, status bar
     hairline: str  # 1px separators
-    accent: str
+    accent: str  # interaction channel only: focus, selection, caret, chip hover
     accent_text: str  # text on accent
     error: str
-    bit_on: str
+    ok: str  # healthy/good status (duty-cycle ok, address space not overflowing)
+    warn: str  # attention status (tolerance exceeded, near-full)
+    chip_bg: str  # mode-chip resting background
+    chip_bg_active: str  # mode-chip hover/pressed background
+    bit_on: str  # data-trace channel: asserted bits, waveform
     bit_off: str
-    bit_changed: str  # outline on bits that flipped vs. the previous value
-    float_sign: str  # IEEE-754 field bands in the bit grid
+    bit_changed: str  # measurement-cursor channel: flipped bits, slice bracket
+    float_sign: str  # IEEE-754 / Qm.n field bands in the bit grid
     float_exp: str
     float_man: str
     syn_number: str
@@ -36,59 +49,96 @@ class Palette:
 
 
 LIGHT = Palette(
-    background="#fafafa",
-    surface="#ffffff",
-    text="#1a1d21",
-    muted="#7a828c",
-    hairline="#e3e6ea",
-    accent="#2563eb",
-    accent_text="#ffffff",
-    error="#c92a2a",
-    bit_on="#2563eb",
-    bit_off="#d5dae1",
-    bit_changed="#d97706",
-    float_sign="#e03131",
-    float_exp="#2b8a3e",
-    float_man="#2563eb",
-    syn_number="#0550ae",
-    syn_function="#6f42c1",
-    syn_operator="#b35900",
+    # "Datasheet": cool technical paper, not the cream-and-serif cliche.
+    background="#F5F7F6",
+    surface="#FFFFFF",
+    surface_sunken="#EDF1EF",
+    text="#18211C",
+    muted="#5B6B61",
+    hairline="#D8DEDA",
+    accent="#2563EB",
+    accent_text="#FFFFFF",
+    error="#C4344F",
+    ok="#0F9960",
+    warn="#B87D0F",
+    chip_bg="#EBEEEC",
+    chip_bg_active="#DCE6FB",
+    bit_on="#0F9960",
+    bit_off="#E1E7E3",
+    bit_changed="#B87D0F",
+    float_sign="#B87D0F",
+    float_exp="#0F9960",
+    float_man="#7C5CBF",
+    syn_number="#0F9960",
+    syn_function="#7C5CBF",
+    syn_operator="#B87D0F",
 )
 
 DARK = Palette(
-    background="#16181c",
-    surface="#1e2126",
-    text="#e8eaed",
-    muted="#8b939e",
-    hairline="#2b2f36",
-    accent="#5b8def",
-    accent_text="#101216",
-    error="#ff6b6b",
-    bit_on="#5b8def",
-    bit_off="#3a4048",
-    bit_changed="#e8a33d",
-    float_sign="#f06d6d",
-    float_exp="#4fc08d",
-    float_man="#5b8def",
-    syn_number="#79c0ff",
-    syn_function="#d2a8ff",
-    syn_operator="#e0af68",
+    # "Instrument screen": phosphor-substrate graphite with a faint green cast.
+    background="#0E1210",
+    surface="#151B18",
+    surface_sunken="#0A0D0B",
+    text="#D6DED9",
+    muted="#6C7A72",
+    hairline="#242D28",
+    accent="#4C8DFF",
+    accent_text="#0A100D",
+    error="#F2637E",
+    ok="#3DDC97",
+    warn="#FFC24B",
+    chip_bg="#1B2420",
+    chip_bg_active="#1E2A44",
+    bit_on="#3DDC97",
+    bit_off="#1E2622",
+    bit_changed="#FFC24B",
+    float_sign="#FFC24B",
+    float_exp="#3DDC97",
+    float_man="#A78BFA",
+    syn_number="#3DDC97",
+    syn_function="#A78BFA",
+    syn_operator="#FFC24B",
 )
 
-MONO_FAMILY = "JetBrains Mono"
+MONO_FAMILY = "JetBrains Mono"  # readout face: every number and expression
+LABEL_FAMILY = "IBM Plex Sans Condensed SemiBold"  # silkscreen face: micro-labels
+
+FONT_MICRO = 11  # silkscreen labels, bit indices
+FONT_SMALL = 13
+FONT_BODY = 15
+FONT_UI = 17
+FONT_RESULT = 18
+FONT_INPUT = 20
+
+SPACE_XS = 4
+SPACE_S = 8
+SPACE_M = 12
+SPACE_L = 16
 
 
-def load_bundled_font() -> str:
-    """Register the bundled monospace font; fall back to the system fixed font."""
-    loaded = False
+def load_bundled_font() -> tuple[str, str]:
+    """Register the bundled fonts; fall back to system fonts if unavailable.
+
+    Returns (mono_family, label_family).
+    """
+    mono_loaded = False
     for name in ("JetBrainsMono-Regular.ttf", "JetBrainsMono-Bold.ttf"):
         ref = resources.files("radix.ui_qt") / "fonts" / name
         with resources.as_file(ref) as path:
             if QFontDatabase.addApplicationFont(str(path)) >= 0:
-                loaded = True
-    if loaded:
-        return MONO_FAMILY
-    return QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+                mono_loaded = True
+    label_loaded = False
+    ref = resources.files("radix.ui_qt") / "fonts" / "IBMPlexSansCondensed-SemiBold.ttf"
+    with resources.as_file(ref) as path:
+        if QFontDatabase.addApplicationFont(str(path)) >= 0:
+            label_loaded = True
+    mono = (
+        MONO_FAMILY
+        if mono_loaded
+        else QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+    )
+    label = LABEL_FAMILY if label_loaded else mono
+    return mono, label
 
 
 def load_app_icon() -> QIcon:
@@ -101,11 +151,11 @@ def load_app_icon() -> QIcon:
     return QIcon(pixmap)
 
 
-def stylesheet(p: Palette, mono: str) -> str:
+def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
     return f"""
     * {{
         font-family: "{mono}";
-        font-size: 18px;
+        font-size: {FONT_UI}px;
     }}
     QMainWindow, QWidget#root {{
         background: {p.background};
@@ -116,20 +166,31 @@ def stylesheet(p: Palette, mono: str) -> str:
         border-bottom: 1px solid {p.hairline};
         padding: 6px;
     }}
-    QPlainTextEdit#input {{
+    QWidget#inputBar {{
         background: {p.surface};
+        border-bottom: 1px solid {p.hairline};
+    }}
+    QWidget#inputBar[focused="true"] {{
+        border-bottom: 1px solid {p.accent};
+    }}
+    QLabel#prompt {{
+        color: {p.accent};
+        font-size: {FONT_INPUT}px;
+        padding: 10px 0px 10px 12px;
+    }}
+    QPlainTextEdit#input {{
+        background: transparent;
         color: {p.text};
         border: none;
-        border-bottom: 1px solid {p.hairline};
         padding: 10px 12px;
-        font-size: 21px;
+        font-size: {FONT_INPUT}px;
         selection-background-color: {p.accent};
         selection-color: {p.accent_text};
     }}
     QLabel#preview {{
         color: {p.muted};
         padding: 2px 12px 8px 12px;
-        font-size: 17px;
+        font-size: {FONT_BODY}px;
     }}
     QListWidget#completerPopup {{
         background: {p.surface};
@@ -137,29 +198,42 @@ def stylesheet(p: Palette, mono: str) -> str:
         border: 1px solid {p.hairline};
         border-radius: 4px;
         padding: 2px;
-        font-size: 17px;
+        font-size: {FONT_BODY}px;
         outline: none;
+    }}
+    QListWidget#completerPopup::item:selected {{
+        background: {p.chip_bg_active};
+        color: {p.text};
     }}
     QLabel#preview[state="error"] {{
         color: {p.error};
     }}
     QWidget#intview {{
-        background: {p.background};
+        background: {p.surface_sunken};
         border-top: 1px solid {p.hairline};
     }}
     QWidget#vizPanel {{
-        background: {p.surface};
+        background: {p.surface_sunken};
         border-top: 1px solid {p.hairline};
     }}
-    QLabel.baseName {{
+    QSplitter::handle {{
+        background: {p.hairline};
+        width: 1px;
+    }}
+    QSplitter::handle:hover {{
+        background: {p.accent};
+    }}
+    QLabel.baseName, QLabel.laneName {{
         color: {p.muted};
-        font-size: 16px;
+        font-family: "{label}";
+        font-size: {FONT_MICRO}px;
     }}
-    QLabel.baseValue {{
+    QLabel.baseValue, QLabel.laneValue {{
         color: {p.text};
-        font-size: 18px;
+        font-size: {FONT_UI}px;
     }}
-    QLabel.baseValue[dimmed="true"], QLabel.baseName[dimmed="true"] {{
+    QLabel.baseValue[dimmed="true"], QLabel.baseName[dimmed="true"],
+    QLabel.laneValue[dimmed="true"], QLabel.laneName[dimmed="true"] {{
         color: {p.muted};
     }}
     QPushButton.copyBtn {{
@@ -168,7 +242,8 @@ def stylesheet(p: Palette, mono: str) -> str:
         border: 1px solid {p.hairline};
         border-radius: 3px;
         padding: 1px 6px;
-        font-size: 15px;
+        font-family: "{label}";
+        font-size: {FONT_SMALL}px;
     }}
     QPushButton.copyBtn:hover {{
         color: {p.accent};
@@ -176,19 +251,19 @@ def stylesheet(p: Palette, mono: str) -> str:
     }}
     QLabel.deltaNote {{
         color: {p.muted};
-        font-size: 15px;
+        font-size: {FONT_SMALL}px;
         padding: 1px 6px;
     }}
     QLabel.sliceNote {{
-        color: {p.accent};
-        font-size: 15px;
+        color: {p.bit_changed};
+        font-size: {FONT_SMALL}px;
         padding: 1px 6px;
     }}
     QStatusBar {{
         background: {p.background};
         color: {p.muted};
         border-top: 1px solid {p.hairline};
-        font-size: 16px;
+        font-size: {FONT_SMALL}px;
     }}
     QStatusBar::item {{ border: none; }}
     QLabel.statusItem {{
@@ -198,13 +273,26 @@ def stylesheet(p: Palette, mono: str) -> str:
     QLabel.statusItem:hover {{
         color: {p.accent};
     }}
+    QToolButton.modeChip {{
+        color: {p.muted};
+        background: {p.chip_bg};
+        border: none;
+        border-radius: 9px;
+        padding: 2px 10px;
+        font-family: "{label}";
+        font-size: {FONT_MICRO}px;
+    }}
+    QToolButton.modeChip:hover, QToolButton.modeChip:pressed {{
+        color: {p.text};
+        background: {p.chip_bg_active};
+    }}
     QListWidget#varsPane {{
         background: {p.surface};
         color: {p.text};
         border: none;
         border-bottom: 1px solid {p.hairline};
         padding: 8px;
-        font-size: 18px;
+        font-size: {FONT_UI}px;
     }}
     QListWidget#varsPane::item {{
         padding: 4px 6px;
@@ -217,7 +305,7 @@ def stylesheet(p: Palette, mono: str) -> str:
         color: {p.text};
         border: none;
         padding: 12px;
-        font-size: 17px;
+        font-size: {FONT_BODY}px;
     }}
     QScrollBar:vertical {{
         background: transparent;
