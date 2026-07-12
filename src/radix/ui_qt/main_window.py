@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         self.root_layout.setSpacing(0)
 
         self.model = HistoryModel()
-        self.delegate = HistoryDelegate(palette)
+        self.delegate = HistoryDelegate(palette, self._alt_base)
         self.history_view = QListView()
         self.history_view.setObjectName("history")
         self.history_view.setModel(self.model)
@@ -522,6 +522,13 @@ class MainWindow(QMainWindow):
     def _reformat_history(self) -> None:
         """Re-render history results under the current display settings."""
         self.model.reformat(self.session.format_value)
+
+    def _alt_base(self, value: Value) -> str | None:
+        """The base session.int_base *isn't* currently showing, or None for non-ints."""
+        if not isinstance(value.number, int):
+            return None
+        base = "dec" if self.session.int_base == "hex" else "hex"
+        return self.session.format_value(value, base=base)
 
     def _refresh_status(self) -> None:
         session = self.session

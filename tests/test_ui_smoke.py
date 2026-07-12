@@ -175,6 +175,18 @@ def test_history_context_actions(qtbot, window: MainWindow) -> None:  # type: ig
     assert window.model.entries[0].expression == "sin(1)"
 
 
+def test_history_value_role_and_alt_chip_source(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.ui_qt.history_model import VALUE_ROLE
+
+    _submit(qtbot, window, "1020")
+    _submit(qtbot, window, "sin(1)")
+    int_value = window.model.data(window.model.index(0), VALUE_ROLE)
+    float_value = window.model.data(window.model.index(1), VALUE_ROLE)
+    assert int_value is not None and int_value.number == 1020
+    assert window._alt_base(int_value) == "0x3FC"  # dec mode -> hex alt chip
+    assert window._alt_base(float_value) is None  # non-integer: no alt chip
+
+
 def test_history_delete_rewrites_store(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 
