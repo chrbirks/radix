@@ -5,6 +5,8 @@ Python and PySide6. Runs on Windows and Linux.
 
 ![CI](../../actions/workflows/ci.yml/badge.svg)
 
+<img src="docs/screenshot.png" alt="Radix: history, a clkdiv() waveform card, and the hex/dec/bin register view" width="480">
+
 Everything is typed into one input field — no button grids. One unified,
 modeless grammar: `**` is always power, `^` is always XOR, and any integer
 result automatically shows hex, decimal, binary, ASCII bytes, and a clickable
