@@ -815,6 +815,16 @@ def test_ref_arm_shows_delta_vs_channel(qtbot, window: MainWindow) -> None:  # t
     assert window.intview.delta_label.text() == f"Δ vs C1 +{gained} -{lost}"
 
 
+def test_channel_strip_click_arms_and_disarms_ref(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._pin_last_result()  # int channel "C1"
+    strip = window.channels._strips[0]
+    strip.clicked.emit()
+    assert window.channels.ref_index == 0
+    strip.clicked.emit()
+    assert window.channels.ref_index is None
+
+
 def test_ref_diff_does_not_reach_bit_grid(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "0xFF")
     window._pin_last_result()

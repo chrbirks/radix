@@ -361,6 +361,7 @@ class ChannelsRack(QWidget):
             strip.copied.connect(self.copied)
             strip.unpin_requested.connect(lambda i=i: self.unpin(i))
             strip.ref_toggled.connect(lambda i=i: self._toggle_ref(i))
+            strip.clicked.connect(lambda i=i: self._toggle_ref(i))
             strip.set_live(self._live)
             self.layout_.addWidget(strip)
             self._strips.append(strip)
