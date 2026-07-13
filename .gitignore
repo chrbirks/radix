@@ -12,3 +12,6 @@ build/
 
 # Local Claude Code settings
 .claude/settings.local.json*
+
+# Planning docs: kept locally, not tracked in git
+docs/*.md
