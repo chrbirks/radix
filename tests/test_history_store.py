@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from radix.history.store import HistoryStore
+from radix.history.store import HistoryStore, StoredEntry
 
 
 def test_roundtrip(tmp_path: Path) -> None:
@@ -38,3 +39,35 @@ def test_clear_removes_file(tmp_path: Path) -> None:
 
 def test_load_missing_file(tmp_path: Path) -> None:
     assert HistoryStore(tmp_path / "nope.jsonl").load() == []
+
+
+def test_int_value_roundtrips(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.jsonl")
+    store.append("0xFF", "255", value=255, prefix="")
+    entries = store.load()
+    assert entries[0].value == 255
+
+
+def test_non_int_value_roundtrips_as_none(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.jsonl")
+    store.append("sin(1)", "0.841470984808")
+    entries = store.load()
+    assert entries[0].value is None
+
+
+def test_load_old_shape_without_value_or_prefix(tmp_path: Path) -> None:
+    path = tmp_path / "history.jsonl"
+    record = {"expression": "0xFF", "result": "255", "note": "", "timestamp": 123.0}
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    entries = HistoryStore(path).load()
+    assert len(entries) == 1
+    assert entries[0].value is None
+    assert entries[0].prefix == ""
+
+
+def test_rewrite_persists_value_and_prefix(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.jsonl")
+    store.rewrite([StoredEntry("x = 0xFF", "x ← 255", value=255, prefix="x ← ")])
+    entries = store.load()
+    assert entries[0].value == 255
+    assert entries[0].prefix == "x ← "

@@ -1,9 +1,13 @@
 """Append-only JSONL history in the platformdirs user-data directory.
 
-Each line: {"expression": ..., "result": ..., "note": ..., "timestamp": ...}.
-Only the display text is persisted — recalled entries re-evaluate through the
-current session, so stored values can never go stale or disagree with the
-engine. Corrupt lines are skipped, never fatal.
+Each line: {"expression": ..., "result": ..., "note": ..., "timestamp": ...,
+"value": ..., "prefix": ...}. Mostly the display text is persisted — recalled
+entries re-evaluate through the current session, so stored text can never
+disagree with the engine. `value` is the exception: for int-valued entries
+the raw integer is also persisted (alongside `prefix`, the assignment badge
+text) so they can still reformat on a base/notation change after a restart,
+same as `channels.py` does for its own int channels. Floats stay
+text-only. Corrupt lines are skipped, never fatal.
 """
 
 from __future__ import annotations
@@ -24,6 +28,8 @@ class StoredEntry:
     result: str
     note: str = ""
     timestamp: float = 0.0
+    value: int | None = None
+    prefix: str = ""
 
 
 def default_path() -> Path:
@@ -47,19 +53,30 @@ class HistoryStore:
                         result=str(raw["result"]),
                         note=str(raw.get("note", "")),
                         timestamp=float(raw.get("timestamp", 0.0)),
+                        value=int(raw["value"]) if raw.get("value") is not None else None,
+                        prefix=str(raw.get("prefix", "")),
                     )
                 )
             except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                 continue  # skip corrupt lines rather than losing the file
         return entries[-MAX_LOADED_ENTRIES:]
 
-    def append(self, expression: str, result: str, note: str = "") -> None:
+    def append(
+        self,
+        expression: str,
+        result: str,
+        note: str = "",
+        value: int | None = None,
+        prefix: str = "",
+    ) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         record = {
             "expression": expression,
             "result": result,
             "note": note,
             "timestamp": time.time(),
+            "value": value,
+            "prefix": prefix,
         }
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record) + "\n")
@@ -74,6 +91,8 @@ class HistoryStore:
                     "result": entry.result,
                     "note": entry.note,
                     "timestamp": entry.timestamp,
+                    "value": entry.value,
+                    "prefix": entry.prefix,
                 }
                 fh.write(json.dumps(record) + "\n")
 

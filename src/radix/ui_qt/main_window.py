@@ -181,7 +181,14 @@ class MainWindow(QMainWindow):
             self._refresh_status()
             for old in self.store.load():
                 self.model.append(
-                    HistoryEntry(old.expression, old.result, old.note, timestamp=old.timestamp)
+                    HistoryEntry(
+                        old.expression,
+                        old.result,
+                        old.note,
+                        value=Value(old.value) if old.value is not None else None,
+                        prefix=old.prefix,
+                        timestamp=old.timestamp,
+                    )
                 )
             self.history_view.scrollToBottom()
             s = app_settings()
@@ -377,7 +384,13 @@ class MainWindow(QMainWindow):
             )
         )
         if self.store is not None:
-            self.store.append(text.strip(), display, outcome.value.note or "")
+            self.store.append(
+                text.strip(),
+                display,
+                outcome.value.note or "",
+                prefix=prefix,
+                value=outcome.value.number if isinstance(outcome.value.number, int) else None,
+            )
         self.history_view.scrollToBottom()
         self.recall_index = None
         self.input.clear()
@@ -576,7 +589,16 @@ class MainWindow(QMainWindow):
             return
         self.store.rewrite(
             [
-                StoredEntry(e.expression, e.result, e.note, e.timestamp)
+                StoredEntry(
+                    e.expression,
+                    e.result,
+                    e.note,
+                    e.timestamp,
+                    value=e.value.number
+                    if e.value is not None and isinstance(e.value.number, int)
+                    else None,
+                    prefix=e.prefix,
+                )
                 for e in self.model.entries
             ]
         )

@@ -226,6 +226,75 @@ def test_history_delete_rewrites_store(qtbot, tmp_path) -> None:  # type: ignore
     assert remaining[0].timestamp > 0
 
 
+def test_int_history_reformats_across_restart(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+
+    win1 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "0xFF")
+    _submit(qtbot, win1, "y = 10")
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win2)
+    assert all(e.value is not None for e in win2.model.entries)
+    before = [e.result for e in win2.model.entries]
+    win2._cycle_int_base()  # dec -> hex
+    after = [e.result for e in win2.model.entries]
+    assert after != before
+    assert after[1].startswith("y ← ")
+
+
+def test_float_history_does_not_reformat_across_restart(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+
+    win1 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "sin(1)")
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win2)
+    assert win2.model.entries[0].value is None
+    before = win2.model.entries[0].result
+    win2._cycle_int_base()
+    assert win2.model.entries[0].result == before
+
+
+def test_int_history_survives_delete_rewrite_and_restart(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+
+    win1 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "0xFF")
+    _submit(qtbot, win1, "1 + 1")
+    win1._history_action("delete", 1)  # delete the "1 + 1" entry, rewriting the store
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win2)
+    assert len(win2.model.entries) == 1
+    assert win2.model.entries[0].value is not None
+    before = win2.model.entries[0].result
+    win2._cycle_int_base()
+    assert win2.model.entries[0].result != before
+
+
 def test_vars_pane_lists_and_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "x = 0xFF")
     _submit(qtbot, window, "vars")
