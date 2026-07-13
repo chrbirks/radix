@@ -799,3 +799,20 @@ def test_channels_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
     win3 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history3.jsonl"))
     qtbot.addWidget(win3)
     assert win3.channels.channels == []
+
+
+def test_corrupt_channels_blob_falls_back_to_empty_rack(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+    from radix.ui_qt.settings import app_settings
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    # Valid JSON, but a channel entry missing its required "kind" key -- the
+    # kind of corruption a hand-edited or truncated settings file could
+    # produce. restore() must reject this atomically, not partially apply it.
+    app_settings().setValue("channels", '{"channels": [{"label": "C1"}]}')
+
+    window = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(window)
+    assert window.channels.channels == []
