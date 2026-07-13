@@ -45,8 +45,11 @@ class HistoryEntry:
     result: str  # formatted primary text (or "x ← 12" for assignments)
     note: str = ""
     # The raw result value lets entries re-render when a display setting
-    # (base, notation, word size) changes. Entries loaded from disk have
-    # value=None and simply keep their recorded text.
+    # (base, notation, word size) changes. Entries loaded from disk carry a
+    # reconstructed Value when the original was an int (HistoryStore persists
+    # the raw number for those); float/text-only entries still load as
+    # value=None and simply keep their recorded text, to avoid re-deriving a
+    # value the engine might now compute differently.
     value: Value | None = None
     prefix: str = ""  # "x ← " for assignments, else ""
     timestamp: float = 0.0  # persistence only; not rendered

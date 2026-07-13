@@ -88,6 +88,15 @@ ambiguity to resolve about major/minor/patch.
   parse the whole entry otherwise — an unresolvable `Exec=` makes GNOME
   Shell unable to see the file at all, which looks identical to the
   original bug.
+- Resizing from wide to narrow could leave the "VARIABLES" caption (and a
+  stale copy of the register view) floating over the single-column layout —
+  the leftover splitter subtree was detached from the layout but never
+  actually hidden.
+- History entries loaded from a previous session never responded to Alt+B
+  (result base) or Alt+N (notation) — only entries evaluated in the current
+  session did. Integer-valued entries now persist their raw value (and the
+  assignment-badge prefix) so they reformat correctly across restarts too;
+  float/text entries still re-evaluate only on recall, unchanged.
 
 ## [2] - 2026-07-12
 
