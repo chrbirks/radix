@@ -252,6 +252,7 @@ class IntegerView(QWidget):
     def __init__(self, palette: Palette, clipboard_setter: Callable[[str], None]) -> None:
         super().__init__()
         self.setObjectName("intview")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.palette_tokens = palette
         self._clipboard = clipboard_setter
         self.scratch = 0
