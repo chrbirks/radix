@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self.theme_mode = "auto"  # "auto" | "light" | "dark"
         self.on_theme_mode_changed: Callable[[], None] | None = None
 
-        self.setWindowTitle(f"Radix v{__version__}")
+        self.setWindowTitle("Radix")
         self.setMinimumSize(520, 600)
 
         root = QWidget()
@@ -256,6 +256,10 @@ class MainWindow(QMainWindow):
         help_hint.setToolTip("help  (F1)")
         help_hint.clicked.connect(lambda _=False: self._show_help())
         bar.addPermanentWidget(help_hint)
+        self.version_label = QLabel(f"v{__version__}")
+        self.version_label.setProperty("class", "statusItem")
+        self.version_label.setToolTip("Radix version")
+        bar.addPermanentWidget(self.version_label)
         self._refresh_status()
 
     def _build_shortcuts(self) -> None:

@@ -20,6 +20,12 @@ ambiguity to resolve about major/minor/patch.
   QFontMetrics segfaults under QT_QPA_PLATFORM=offscreen from exactly this
   class of missing-glyph fallback before).
 
+### Changed
+
+- The version no longer appears in the window title (just "Radix" now) —
+  it's shown as a small "vN" item at the far right of the status bar
+  instead. Still appears in the help pane header and `--version`.
+
 ## [4] - 2026-07-13
 
 ### Added
