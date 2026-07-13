@@ -688,6 +688,8 @@ def test_wide_narrow_wide_keeps_watch_rack_functional(qtbot, window: MainWindow)
     assert window.pane_stack.count() == 2  # history + help only, vars moved out
     labels = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
     assert any("foo = 7" in t for t in labels)
+    assert window.inspector.parent() is window.splitter
+    assert window.splitter.count() == 2
 
 
 def test_vars_command_in_wide_mode(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
