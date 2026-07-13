@@ -15,8 +15,9 @@ ambiguity to resolve about major/minor/patch.
   evaluated result at a large, bold size — previously the answer was only
   visible as the newest (unemphasized) history row, with the live preview
   going blank right after Enter. Persists across restarts (seeded from the
-  last loaded history entry) and shows a dimmed placeholder before the
-  first evaluation.
+  last loaded history entry), shows a dimmed placeholder before the first
+  evaluation, and reformats along with history when the result base,
+  notation, signedness, or word size changes.
 
 ### Fixed
 

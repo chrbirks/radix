@@ -84,6 +84,14 @@ def test_result_readout_tracks_last_evaluated_result(qtbot, window: MainWindow) 
     assert window.result_label.text() == "x = 5"
 
 
+def test_result_readout_reformats_on_base_change(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF << 2")
+    assert window.result_label.text() == "1020"
+    window._cycle_int_base()  # dec -> hex
+    assert window.result_label.text() == window.model.entries[-1].result
+    assert window.result_label.text() != "1020"
+
+
 def test_result_readout_seeded_from_persisted_history(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 

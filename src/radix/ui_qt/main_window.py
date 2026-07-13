@@ -184,11 +184,7 @@ class MainWindow(QMainWindow):
                         timestamp=old.timestamp,
                     )
                 )
-            if self.model.entries:
-                last = self.model.entries[-1]
-                name, value_text = split_assignment(last.result, last.prefix)
-                self.result_label.setText(f"{name} = {value_text}" if name else value_text)
-                self.result_label.setProperty("dimmed", "false")
+            self._refresh_result_label()
             s = app_settings()
             geometry = s.value("geometry")
             if geometry is not None:
@@ -613,6 +609,7 @@ class MainWindow(QMainWindow):
     def _after_setting_change(self) -> None:
         self._refresh_status()
         self._reformat_history()
+        self._refresh_result_label()
         self.channels.refresh(self.session.format_value, self.session.word_size)
         if self.vars_pane.isVisibleTo(self):
             self._refresh_vars_pane()  # values honor the new base/notation
@@ -629,6 +626,15 @@ class MainWindow(QMainWindow):
     def _reformat_history(self) -> None:
         """Re-render history results under the current display settings."""
         self.model.reformat(self.session.format_value)
+
+    def _refresh_result_label(self) -> None:
+        """Sync the RESULT readout with the (possibly just-reformatted) last entry."""
+        if not self.model.entries:
+            return
+        last = self.model.entries[-1]
+        name, value_text = split_assignment(last.result, last.prefix)
+        self.result_label.setText(f"{name} = {value_text}" if name else value_text)
+        self.result_label.setProperty("dimmed", "false")
 
     def _refresh_status(self) -> None:
         session = self.session
