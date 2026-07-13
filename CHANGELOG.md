@@ -30,13 +30,6 @@ ambiguity to resolve about major/minor/patch.
   window was ever shown — item heights (word-wrapped) depend on the real,
   polished viewport width, which isn't final until the first show. Deferred
   the initial scroll to a `showEvent` override that fires once.
-- The READOUT/REGISTER panel (`intview`) never actually got its intended
-  "recessed screen" background — Qt silently ignores a QSS `background:`
-  rule on a plain `QWidget` without `WA_StyledBackground` set, which
-  `vizPanel`/`channelsRack` had but `intview` didn't, so it always showed
-  through to the plain chassis color instead of the darker `surface_sunken`
-  tone. Most visible as an inconsistent, lighter grey next to the TRACE and
-  RESULT panels.
 
 ## [3] - 2026-07-13
 

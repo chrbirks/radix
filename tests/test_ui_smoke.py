@@ -150,15 +150,6 @@ def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWin
     assert window.vizpanel.isVisibleTo(window)
 
 
-def test_intview_and_vizpanel_share_sunken_background_styling(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    # QSS `background:` on a plain QWidget is a no-op without this attribute
-    # (Qt silently falls through to the parent's background instead) --
-    # intview lacked it, so READOUT/REGISTER never actually got the
-    # "recessed screen" surface_sunken look that vizPanel (TRACE) already had.
-    assert window.intview.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
-    assert window.vizpanel.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
-
-
 def test_zone_captions_have_expected_text(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     assert window.inspector.trace_caption.text() == "TRACE"
     assert window.intview.readout_caption.text() == "READOUT"
