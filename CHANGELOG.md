@@ -9,6 +9,15 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Added
+
+- A RESULT zone between history and the input bar shows the most recently
+  evaluated result at a large, bold size — previously the answer was only
+  visible as the newest (unemphasized) history row, with the live preview
+  going blank right after Enter. Persists across restarts (seeded from the
+  last loaded history entry) and shows a dimmed placeholder before the
+  first evaluation.
+
 ### Fixed
 
 - The hex-digit label above each nibble in the register view's bit grid was

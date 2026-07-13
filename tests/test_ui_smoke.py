@@ -71,6 +71,38 @@ def test_assignment_and_recall(qtbot, window: MainWindow) -> None:  # type: igno
     assert window.input.text() == "x = 0xFF"
 
 
+def test_result_readout_shows_placeholder_before_first_result(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert window.result_label.text() == "—"
+    assert window.result_label.property("dimmed") == "true"
+
+
+def test_result_readout_tracks_last_evaluated_result(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF << 2")
+    assert window.result_label.text() == "1020"
+    assert window.result_label.property("dimmed") == "false"
+    _submit(qtbot, window, "x = 5")
+    assert window.result_label.text() == "x = 5"
+
+
+def test_result_readout_seeded_from_persisted_history(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+
+    win1 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "x = 0xFF")
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win2)
+    assert win2.result_label.text() == "x = 255"
+    assert win2.result_label.property("dimmed") == "false"
+
+
 def test_live_preview_shows_xor_and_result(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     window.input.setText("2^10")
     window._update_preview()

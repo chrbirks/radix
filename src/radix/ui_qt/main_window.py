@@ -38,11 +38,17 @@ from radix.history.store import HistoryStore, StoredEntry
 from radix.session import Session
 from radix.ui_qt.completer import Completer
 from radix.ui_qt.highlight import ExprHighlighter
-from radix.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
+from radix.ui_qt.history_model import (
+    HistoryDelegate,
+    HistoryEntry,
+    HistoryModel,
+    split_assignment,
+)
 from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
 from radix.ui_qt.theme import LABEL_FAMILY, Palette
+from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
 PREVIEW_DEBOUNCE_MS = 100
 
@@ -114,6 +120,14 @@ class MainWindow(QMainWindow):
         self.pane_stack.addWidget(self.vars_pane)
         self.pane_stack.setCurrentWidget(self.history_view)
 
+        self.result_caption = ZoneCaption("RESULT")
+        self.result_caption.set_palette(palette)
+        self.result_label = QLabel("—")
+        self.result_label.setObjectName("resultValue")
+        self.result_label.setProperty("dimmed", "true")
+        self.result_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.result_label.setWordWrap(True)
+
         self.input_bar = InputBar()
         self.input = self.input_bar.input
         self.preview = self.input_bar.preview
@@ -136,6 +150,8 @@ class MainWindow(QMainWindow):
         self.channels.ref_changed.connect(self._on_ref_changed)
 
         self.root_layout.addWidget(self.pane_stack, 1)
+        self.root_layout.addWidget(margin_wrap(self.result_caption, 12))
+        self.root_layout.addWidget(self.result_label)
         self.root_layout.addWidget(self.input_bar)
         self.root_layout.addWidget(self.inspector)
         self.setCentralWidget(root)
@@ -168,6 +184,11 @@ class MainWindow(QMainWindow):
                         timestamp=old.timestamp,
                     )
                 )
+            if self.model.entries:
+                last = self.model.entries[-1]
+                name, value_text = split_assignment(last.result, last.prefix)
+                self.result_label.setText(f"{name} = {value_text}" if name else value_text)
+                self.result_label.setProperty("dimmed", "false")
             s = app_settings()
             geometry = s.value("geometry")
             if geometry is not None:
@@ -284,6 +305,15 @@ class MainWindow(QMainWindow):
         prefix = f"{outcome.target} ← " if outcome.kind == "assign" else ""
         display = prefix + primary
         self.last_result_text = primary
+        # ASCII "=" rather than the stored "x ← " prefix: QFontMetrics
+        # segfaults under QT_QPA_PLATFORM=offscreen measuring the arrow glyph
+        # (see split_assignment), and this is a plain QLabel, not custom-painted.
+        result_readout = f"{outcome.target} = {primary}" if outcome.kind == "assign" else primary
+        self.result_label.setText(result_readout)
+        self.result_label.setProperty("dimmed", "false")
+        style = self.result_label.style()
+        style.unpolish(self.result_label)
+        style.polish(self.result_label)
         self.model.append(
             HistoryEntry(
                 text.strip(),
@@ -726,6 +756,7 @@ class MainWindow(QMainWindow):
     def apply_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
+        self.result_caption.set_palette(palette)
         self.inspector.set_palette(palette)
         self.highlighter.set_palette(palette)
         self.completer.set_palette(palette)

@@ -188,6 +188,19 @@ def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
         selection-background-color: {p.accent};
         selection-color: {p.accent_text};
     }}
+    QLabel#resultValue {{
+        background: {p.surface_sunken};
+        color: {p.text};
+        font-size: {FONT_RESULT}px;
+        font-weight: 600;
+        padding: 10px 12px;
+        border-radius: 4px;
+        margin: 0px 12px;
+    }}
+    QLabel#resultValue[dimmed="true"] {{
+        color: {p.muted};
+        font-weight: 400;
+    }}
     QLabel#preview {{
         color: {p.muted};
         padding: 2px 12px 8px 12px;

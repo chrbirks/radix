@@ -39,6 +39,19 @@ BADGE_GAP = 8
 SELECT_BAR_W = 2
 
 
+def split_assignment(result: str, prefix: str) -> tuple[str, str]:
+    """("x", "12") for an assignment entry's (result, prefix), else ("", result).
+
+    Never returns the literal "x ← " arrow text — QFontMetrics.horizontalAdvance
+    segfaults under QT_QPA_PLATFORM=offscreen for glyphs needing font fallback,
+    so every renderer splits around the arrow instead of measuring/painting it.
+    """
+    if not prefix:
+        return "", result
+    name = prefix.partition(" ←")[0]  # "x ← " -> "x"
+    return name, result[len(prefix) :]
+
+
 @dataclass(frozen=True)
 class HistoryEntry:
     expression: str
@@ -166,9 +179,8 @@ class HistoryDelegate(QStyledItemDelegate):
         result_metrics = QFontMetrics(result_font)
         x = result_rect.left()
 
-        display_result = result
-        if prefix:
-            name = prefix.partition(" ←")[0]  # "x ← " -> "x"
+        name, display_result = split_assignment(result, prefix)
+        if name:
             badge_w = result_metrics.horizontalAdvance(name) + 2 * BADGE_PAD_H
             badge_rect = QRect(x, result_rect.top() + 2, badge_w, result_rect.height() - 4)
             painter.setPen(Qt.PenStyle.NoPen)
@@ -178,7 +190,6 @@ class HistoryDelegate(QStyledItemDelegate):
             painter.setFont(result_font)
             painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, name)
             x += badge_w + BADGE_GAP
-            display_result = result[len(prefix) :]
 
         painter.setFont(result_font)
         painter.setPen(QColor(p.text))
