@@ -297,6 +297,10 @@ class MainWindow(QMainWindow):
             # first — vsplitter at the top, inspector beside it.
             self.splitter.insertWidget(0, self.vsplitter)
             self.splitter.addWidget(self.inspector)
+            # Undo the narrow branch's explicit hide() — an explicit hide persists
+            # across re-adding to a layout, same class of bug as vars_pane's
+            # inherited QStackedWidget hidden flag above.
+            self.splitter.show()
             self.watch_section.setVisible(self._watch_visible)
             self._refresh_vars_pane()
             self.root_layout.addWidget(self.splitter, 1)
@@ -310,6 +314,11 @@ class MainWindow(QMainWindow):
             self.pane_stack.addWidget(self.vars_pane)  # reparent back into the stack
             self.root_layout.addWidget(self.input_bar)
             self.root_layout.addWidget(self.inspector)
+            # root_layout.removeWidget(splitter) above only stops layout
+            # management — splitter still holds vsplitter/watch_section (pane_stack
+            # was the only child pulled out), so without an explicit hide it stays
+            # visible at its old wide-mode geometry, floating over the narrow layout.
+            self.splitter.hide()
         self.vars_pane.setProperty("compact", wide)
         self.vars_pane.style().unpolish(self.vars_pane)
         self.vars_pane.style().polish(self.vars_pane)

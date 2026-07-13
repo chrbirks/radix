@@ -655,6 +655,7 @@ def test_wide_layout_splits_panes_and_evaluates(qtbot, window: MainWindow) -> No
     assert window.watch_section.parent() is window.vsplitter
     assert window.vars_pane.parent() is window.watch_section
     assert window.input_bar.isVisibleTo(window)
+    assert window.splitter.isVisibleTo(window)
     _submit(qtbot, window, "0xFF + 1")
     assert window.model.entries[-1].result == "256"
     assert window.intview.active
@@ -672,6 +673,12 @@ def test_narrow_return_reverts_to_single_column(qtbot, window: MainWindow) -> No
     assert window.pane_stack.parent() is not window.vsplitter
     assert window.inspector.parent() is not window.splitter
     assert window.vars_pane.parent() is window.pane_stack  # back in the stack
+    # Regression: the lingering splitter still holds real content (vsplitter ->
+    # watch_section, with the VARIABLES caption) unlike its pre-watch-rack empty
+    # state, so it must be explicitly hidden or it floats over the narrow layout
+    # at its old wide-mode geometry.
+    assert not window.splitter.isVisibleTo(window)
+    assert not window.watch_section.isVisibleTo(window)
     _submit(qtbot, window, "1 + 1")
     assert window.model.entries[-1].result == "2"
 
@@ -690,6 +697,10 @@ def test_wide_narrow_wide_keeps_watch_rack_functional(qtbot, window: MainWindow)
     assert any("foo = 7" in t for t in labels)
     assert window.inspector.parent() is window.splitter
     assert window.splitter.count() == 2
+    # Regression: splitter.hide() in the intervening narrow pass must not
+    # persist once re-added to root_layout on the way back to wide.
+    assert window.splitter.isVisibleTo(window)
+    assert window.watch_section.isVisibleTo(window)
 
 
 def test_vars_command_in_wide_mode(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
