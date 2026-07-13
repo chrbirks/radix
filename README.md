@@ -34,7 +34,15 @@ uv run radix -e help         # the built-in overview
 
 Or grab a standalone build (no Python needed) from CI artifacts: unzip and run
 `radix`/`radix.exe`. Windows SmartScreen will warn on the unsigned
-binary — this is a known v1 limitation. `radix --version` prints the
+binary — this is a known v1 limitation (no code-signing certificate yet).
+If it says an admin has to approve it, or blocks the app outright with no
+"Run anyway" option, you don't need admin rights to fix this yourself:
+right-click `radix.exe` → **Properties** → check **Unblock** → OK (or
+`Unblock-File -Path .\radix.exe` in PowerShell). This clears the
+"downloaded from the internet" flag that triggers SmartScreen in the first
+place. If even that's locked down by an organization policy, run from
+source instead (`uv run radix`, see Quick start above) — nothing gets
+executed as an unsigned binary that way. `radix --version` prints the
 version; release history lives in [CHANGELOG.md](CHANGELOG.md).
 
 On Linux, Wayland compositors (GNOME Shell in particular) show the running
