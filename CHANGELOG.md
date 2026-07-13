@@ -26,29 +26,18 @@ ambiguity to resolve about major/minor/patch.
   recalls the expression as before). The inspected row gets a highlighted
   accent bar; typing, evaluating, or Esc returns to following the live
   input/last result.
-- Wide mode (window ≥ 900px) now shows an always-visible "VARIABLES" watch
-  rack below the history/help pane: a compact list of the current variables
-  that updates live as you assign them or change the display base/notation.
-  Alt+V (or the `vars` command) toggles the rack instead of swapping it into
-  the pane stack. Narrow mode is unchanged — vars still swap in via Alt+V.
 
 ### Changed
 
 - The inspector panel is now organized into silkscreen-captioned zones
   (TRACE / READOUT / REGISTER / CHANNELS) with hairline rules between them,
   matching the screen-printed sections of a physical front panel.
-- In wide mode the left column is a vertical splitter (history/help pane over
-  the variables watch rack) beside the inspector; the split position and the
-  rack's shown/hidden state persist across restarts.
 - Redesigned the UI around a "bench instrument" visual direction (precision
   test equipment / waveform viewer) instead of the generic dark-IDE look:
   a two-channel "instrument screen" dark palette (blue = interaction,
   phosphor green = data trace, amber = measurement cursor) and a
   "datasheet" light palette, paired with a silkscreen label face
   (IBM Plex Sans Condensed SemiBold) alongside the JetBrains Mono readout.
-- The window now adapts to its width: a single column below 900px, and a
-  splitter (history/help/vars | inspector) above it, with the input bar
-  spanning the full width underneath either way.
 - The register view's bit grid folds leading all-zero rows behind a
   collapsed rail (click it, or Alt+E, to expand) instead of always
   showing every row of a 64-bit word.
@@ -88,10 +77,6 @@ ambiguity to resolve about major/minor/patch.
   parse the whole entry otherwise — an unresolvable `Exec=` makes GNOME
   Shell unable to see the file at all, which looks identical to the
   original bug.
-- Resizing from wide to narrow could leave the "VARIABLES" caption (and a
-  stale copy of the register view) floating over the single-column layout —
-  the leftover splitter subtree was detached from the layout but never
-  actually hidden.
 - History entries loaded from a previous session never responded to Alt+B
   (result base) or Alt+N (notation) — only entries evaluated in the current
   session did. Integer-valued entries now persist their raw value (and the

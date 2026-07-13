@@ -11,6 +11,16 @@ captions, click-to-inspect history, a channels/REF rack, and a wide-mode variabl
 That plan's own Context section explicitly keeps this plan's visual identity (palettes, fonts)
 and only reworks the *working model* — read it for anything past this document's WP9.
 
+**Post-completion follow-up (2026-07-13, later): WP2's adaptive layout is gone.** This plan's
+WP2 (below) introduced `WIDE_BREAKPOINT`/`_apply_layout` so the window would switch to a
+side-by-side splitter above 900px; the front-panel-rework plan's WP5 later nested a watch rack
+into that same splitter. Both were removed at the user's request the same day WP5 shipped — the
+app is now a single always-narrow column at every window size, full stop. `main_window.py` no
+longer has `_apply_layout`, `splitter`, `vsplitter`, or `WIDE_BREAKPOINT` at all. Leave WP2's
+write-up below as history of the original design — don't reintroduce width-based layout
+switching citing it without being asked; that call is reversed, same as the BIN row and alt-base
+chip below.
+
 **Post-completion follow-up (2026-07-12):** WP3's "delete the BIN row" call (§ below, and the
 `test_bin_lane_removed_and_ascii_lane_hides` test) was reversed at the user's request — BIN is
 back as a fourth integer-mode lane (`HEX/DEC/BIN/ASC`), set bits highlighted in the grid's

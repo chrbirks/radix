@@ -1,8 +1,24 @@
 # Radix front-panel rework — zones, channels/REF, live history, watch rack
 
-Status: **complete** (WP1-WP5 done). This document is self-contained: an executor (human or
-LLM) with no prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints
-are law.
+Status: **complete** (WP1-WP5 done); **WP5 subsequently reverted** — see the note below. This
+document is self-contained: an executor (human or LLM) with no prior context can implement it.
+Read the repo's `CLAUDE.md` first — its constraints are law.
+
+**Post-completion follow-up (2026-07-13, same day):** the entire wide/narrow adaptive layout —
+WP5's watch rack (below) *and* the earlier "bench instrument" redesign's underlying wide-mode
+splitter it nested into (`docs/ui-redesign-plan.md`, predates this plan) — was removed at the
+user's request in favor of a single always-narrow column, regardless of window width. `main_window.py`
+no longer has `_apply_layout`, `splitter`, `vsplitter`, `watch_section`/`watch_caption`,
+`WIDE_BREAKPOINT`, or the vars-pane "compact" styling; the layout is now built once in `__init__`
+and never changes on resize. All wide-mode-specific tests (`test_wide_layout_splits_panes_and_
+evaluates`, `test_narrow_return_reverts_to_single_column`, `test_wide_narrow_wide_keeps_watch_
+rack_functional`, `test_vars_command_in_wide_mode`, `test_alt_v_toggle_in_wide_mode`, `test_
+setting_change_rerenders_watch_in_wide`, `test_vsplitter_and_watch_visible_persist_across_
+windows`) were deleted rather than adapted, since the feature they tested no longer exists.
+**Leave WP5's write-up below as history of what was built and why (including the two genuine Qt
+nested-splitter bugs found and fixed while it existed) — don't re-read it as a spec to
+re-implement without being asked; the wide-mode concept itself was the thing reversed, not a
+detail within it.**
 
 ## Context
 

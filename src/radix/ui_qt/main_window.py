@@ -1,11 +1,10 @@
-"""The adaptive single-window UI.
+"""The single-window UI: one column, always.
 
-Narrow (< WIDE_BREAKPOINT): history/help/vars pane (stretches) / input bar /
-inspector, stacked in one column. Wide: a splitter puts the pane stack and
-the inspector side by side, with the input bar spanning the full width
-underneath. Keyboard-first: the input line is always focused; Up/Down
-recall history; `help` and `clear` are typed commands. All math goes through
-Session — the UI never computes anything itself.
+History/help/vars pane (stretches) / input bar / inspector, stacked
+top-to-bottom regardless of window size. Keyboard-first: the input line is
+always focused; Up/Down recall history; `help` and `clear` are typed
+commands. All math goes through Session — the UI never computes anything
+itself.
 """
 
 from __future__ import annotations
@@ -24,7 +23,6 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QMenu,
-    QSplitter,
     QStackedWidget,
     QTextEdit,
     QToolButton,
@@ -45,10 +43,8 @@ from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
 from radix.ui_qt.theme import LABEL_FAMILY, Palette
-from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
 PREVIEW_DEBOUNCE_MS = 100
-WIDE_BREAKPOINT = 900  # splitter (pane stack | inspector) above this width
 
 SHORTCUT_HELP = """Keyboard shortcuts
   Enter        evaluate          Up / Down    recall history
@@ -64,8 +60,6 @@ SHORTCUT_HELP = """Keyboard shortcuts
 
 
 class MainWindow(QMainWindow):
-    _wide: bool  # set by _apply_layout; absent until the first call
-
     def __init__(
         self, session: Session, palette: Palette, store: HistoryStore | None = None
     ) -> None:
@@ -141,25 +135,9 @@ class MainWindow(QMainWindow):
         self.channels.copied.connect(self._toast)
         self.channels.ref_changed.connect(self._on_ref_changed)
 
-        self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.splitter.setChildrenCollapsible(False)
-        self._pending_splitter_state: object | None = None
-
-        # Wide mode nests a vertical splitter (pane stack over an always-visible
-        # variables watch rack) inside the left slot of `splitter`.
-        self.vsplitter = QSplitter(Qt.Orientation.Vertical)
-        self.vsplitter.setChildrenCollapsible(False)
-        self._pending_vsplitter_state: object | None = None
-        self._watch_visible = True
-        self.watch_caption = ZoneCaption("VARIABLES")
-        self.watch_caption.set_palette(palette)
-        self.watch_section = QWidget()
-        self._watch_layout = QVBoxLayout(self.watch_section)
-        self._watch_layout.setContentsMargins(0, 0, 0, 0)
-        self._watch_layout.setSpacing(0)
-        self._watch_layout.addWidget(margin_wrap(self.watch_caption, 8))
-
-        self._apply_layout(wide=False)
+        self.root_layout.addWidget(self.pane_stack, 1)
+        self.root_layout.addWidget(self.input_bar)
+        self.root_layout.addWidget(self.inspector)
         self.setCentralWidget(root)
 
         self._build_status_bar()
@@ -197,9 +175,6 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(geometry)
             if s.value("always_on_top", False, type=bool):
                 self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-            self._pending_splitter_state = s.value("splitter_state")
-            self._pending_vsplitter_state = s.value("vsplitter_state")
-            self._watch_visible = bool(s.value("watch_visible", True, type=bool))
             channels_blob = s.value("channels")
             if channels_blob is not None:
                 with contextlib.suppress(ValueError, KeyError, TypeError):
@@ -267,68 +242,6 @@ class MainWindow(QMainWindow):
             action.setShortcut(QKeySequence(keys))
             action.triggered.connect(handler)
             self.addAction(action)
-
-    def _apply_layout(self, wide: bool) -> None:
-        """Narrow: stack / input bar / inspector, one column. Wide: a
-        splitter puts the stack and inspector side by side, with the input
-        bar spanning the full width underneath.
-
-        Idempotent (resizeEvent calls it on every resize) and safe to call
-        before the window is ever shown (the first call always applies,
-        since `_wide` doesn't exist yet).
-        """
-        if hasattr(self, "_wide") and wide == self._wide:
-            return
-        self._wide = wide
-        for w in (self.pane_stack, self.inspector, self.input_bar, self.splitter):
-            self.root_layout.removeWidget(w)
-        if wide:
-            # The vsplitter never leaves the splitter once built (it lingers as
-            # a detached-but-owned subtree while narrow), so its emptiness — not
-            # the splitter's — is the reliable "first ever wide entry" signal.
-            first_time = self.vsplitter.count() == 0
-            if first_time:
-                self.vsplitter.addWidget(self.pane_stack)
-                self.vsplitter.addWidget(self.watch_section)
-            # Move vars_pane out of the stack into the watch rack. A stack must
-            # never show a page it no longer owns, so flip to history first.
-            if self.pane_stack.currentWidget() is self.vars_pane:
-                self.pane_stack.setCurrentWidget(self.history_view)
-            self._watch_layout.addWidget(self.vars_pane)
-            # The stack hides every non-current page; vars_pane keeps that hidden
-            # flag when reparented, so the watch rack would show empty otherwise.
-            self.vars_pane.show()
-            self.vsplitter.insertWidget(0, self.pane_stack)
-            # Narrow pulled both splitter children back into root_layout, so
-            # re-seat them every wide transition (atomic reparent), not just the
-            # first — vsplitter at the top, inspector beside it.
-            self.splitter.insertWidget(0, self.vsplitter)
-            self.splitter.addWidget(self.inspector)
-            # Undo the narrow branch's explicit hide() — an explicit hide persists
-            # across re-adding to a layout, same class of bug as vars_pane's
-            # inherited QStackedWidget hidden flag above.
-            self.splitter.show()
-            self.watch_section.setVisible(self._watch_visible)
-            self._refresh_vars_pane()
-            self.root_layout.addWidget(self.splitter, 1)
-            self.root_layout.addWidget(self.input_bar)
-            if first_time and self._pending_splitter_state is not None:
-                self.splitter.restoreState(self._pending_splitter_state)  # type: ignore[arg-type]
-            if first_time and self._pending_vsplitter_state is not None:
-                self.vsplitter.restoreState(self._pending_vsplitter_state)  # type: ignore[arg-type]
-        else:
-            self.root_layout.addWidget(self.pane_stack, 1)
-            self.pane_stack.addWidget(self.vars_pane)  # reparent back into the stack
-            self.root_layout.addWidget(self.input_bar)
-            self.root_layout.addWidget(self.inspector)
-            # root_layout.removeWidget(splitter) above only stops layout
-            # management — splitter still holds vsplitter/watch_section (pane_stack
-            # was the only child pulled out), so without an explicit hide it stays
-            # visible at its old wide-mode geometry, floating over the narrow layout.
-            self.splitter.hide()
-        self.vars_pane.setProperty("compact", wide)
-        self.vars_pane.style().unpolish(self.vars_pane)
-        self.vars_pane.style().polish(self.vars_pane)
 
     # -- evaluate / preview -------------------------------------------------------
 
@@ -735,24 +648,10 @@ class MainWindow(QMainWindow):
 
     def _show_vars(self) -> None:
         self._refresh_vars_pane()
-        if self._wide:
-            self._watch_visible = True
-            self.watch_section.setVisible(True)
-            if self.store is not None:
-                app_settings().setValue("watch_visible", True)
-        else:
-            self.pane_stack.setCurrentWidget(self.vars_pane)
+        self.pane_stack.setCurrentWidget(self.vars_pane)
 
     def _toggle_vars(self) -> None:
-        if self._wide:
-            visible = not self.watch_section.isVisibleTo(self)
-            self._watch_visible = visible
-            self.watch_section.setVisible(visible)
-            if visible:
-                self._refresh_vars_pane()
-            if self.store is not None:
-                app_settings().setValue("watch_visible", visible)
-        elif self.vars_pane.isVisibleTo(self):
+        if self.vars_pane.isVisibleTo(self):
             self._hide_help()
         else:
             self._show_vars()
@@ -813,11 +712,6 @@ class MainWindow(QMainWindow):
         if self.store is not None:
             save_session(self.session)
             app_settings().setValue("geometry", self.saveGeometry())
-            if self.splitter.count() > 0:
-                app_settings().setValue("splitter_state", self.splitter.saveState())
-            if self.vsplitter.count() > 0:
-                app_settings().setValue("vsplitter_state", self.vsplitter.saveState())
-            app_settings().setValue("watch_visible", self._watch_visible)
             app_settings().setValue("channels", json.dumps(self.channels.to_json()))
         super().closeEvent(event)  # type: ignore[arg-type]
 
@@ -829,7 +723,6 @@ class MainWindow(QMainWindow):
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
         self.inspector.set_palette(palette)
-        self.watch_caption.set_palette(palette)
         self.highlighter.set_palette(palette)
         self.completer.set_palette(palette)
         self.history_view.viewport().update()
@@ -839,6 +732,4 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event: object) -> None:  # popup geometry would go stale
         if hasattr(self, "completer"):
             self.completer.hide()
-        if hasattr(self, "_wide"):
-            self._apply_layout(self.width() >= WIDE_BREAKPOINT)
         super().resizeEvent(event)  # type: ignore[arg-type]
