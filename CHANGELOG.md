@@ -11,6 +11,21 @@ ambiguity to resolve about major/minor/patch.
 
 ### Added
 
+- Channels rack: pin up to 8 values — from a history entry's right-click menu,
+  the integer panel's "pin" button, or Alt+P for the last result — as
+  scope-style strips (slot label, formatted value, mini bit strip) below the
+  register view. Pinned channels persist across restarts. One channel can be
+  armed as REF (click its strip, or its context menu): the armed strip shows
+  a live XOR readout and a second amber mini bit strip against whatever value
+  the panel is currently showing, and the integer panel's delta note reads
+  `Δ vs C1 +n -m` instead of the plain previous-value diff. The register grid
+  itself is unaffected either way — it always highlights only the diff
+  against the panel's own previous value, never the REF diff.
+- Click a history entry to inspect its value in the register/viz panel
+  without touching the input line or recalling it (double-click still
+  recalls the expression as before). The inspected row gets a highlighted
+  accent bar; typing, evaluating, or Esc returns to following the live
+  input/last result.
 - Wide mode (window ≥ 900px) now shows an always-visible "VARIABLES" watch
   rack below the history/help pane: a compact list of the current variables
   that updates live as you assign them or change the display base/notation.
@@ -19,6 +34,9 @@ ambiguity to resolve about major/minor/patch.
 
 ### Changed
 
+- The inspector panel is now organized into silkscreen-captioned zones
+  (TRACE / READOUT / REGISTER / CHANNELS) with hairline rules between them,
+  matching the screen-printed sections of a physical front panel.
 - In wide mode the left column is a vertical splitter (history/help pane over
   the variables watch rack) beside the inspector; the split position and the
   rack's shown/hidden state persist across restarts.

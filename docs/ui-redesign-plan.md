@@ -5,6 +5,12 @@ prior context can implement it. Read the repo's `CLAUDE.md` first — its constr
 the non-negotiable ones are repeated in §3 because violating them causes segfaults or data
 loss, not style nits.
 
+**Post-completion follow-up (2026-07-13):** a second design round built directly on top of this
+plan's result — see `docs/front-panel-rework-plan.md` (WP1-WP5, complete): inspector zone
+captions, click-to-inspect history, a channels/REF rack, and a wide-mode variables watch rack.
+That plan's own Context section explicitly keeps this plan's visual identity (palettes, fonts)
+and only reworks the *working model* — read it for anything past this document's WP9.
+
 **Post-completion follow-up (2026-07-12):** WP3's "delete the BIN row" call (§ below, and the
 `test_bin_lane_removed_and_ascii_lane_hides` test) was reversed at the user's request — BIN is
 back as a fourth integer-mode lane (`HEX/DEC/BIN/ASC`), set bits highlighted in the grid's

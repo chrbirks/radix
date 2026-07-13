@@ -1,6 +1,6 @@
 # Radix front-panel rework — zones, channels/REF, live history, watch rack
 
-Status: **in progress** (WP1-WP4 done; WP5 not started). This document is self-contained: an executor (human or
+Status: **complete** (WP1-WP5 done). This document is self-contained: an executor (human or
 LLM) with no prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints
 are law.
 
@@ -213,36 +213,57 @@ and gets visually dense at narrow widths (cosmetic); the `refTag` QSS class is r
 for `xor_label` rather than a distinct class (fine while both are the same amber; would need
 splitting if their styling ever diverges).
 
-## WP5 — Wide-mode variables watch rack (nested vertical splitter)
+## WP5 — Wide-mode variables watch rack (nested vertical splitter) ✅ done (commits 4fe2b89, dc542c1)
 
-- [ ] `main_window.py`: `self.vsplitter = QSplitter(Vertical)` (childrenCollapsible False) +
+- [x] `main_window.py`: `self.vsplitter = QSplitter(Vertical)` (childrenCollapsible False) +
       `self.watch_section` (ZoneCaption("VARIABLES") + slot for vars_pane); widgets added lazily
-      on first wide layout (mirrors the existing splitter pattern); `_pending_vsplitter_state`
-      restored alongside `splitter_state` (~:167).
-- [ ] `_apply_layout` (~:226-252) rework — wide: vsplitter(pane_stack | watch_section) inside
+      on first wide layout; `_pending_vsplitter_state` restored alongside `splitter_state`.
+- [x] `_apply_layout` rework — wide: vsplitter(pane_stack | watch_section) inside
       splitter(vsplitter | inspector); on every narrow→wide transition move `vars_pane` from the
-      QStackedWidget into watch_section (fix `pane_stack.currentWidget()` to history first), and
-      `vsplitter.insertWidget(0, pane_stack)` when returning from narrow. Narrow:
-      `root_layout.addWidget(pane_stack)` pulls it out; `pane_stack.addWidget(vars_pane)`
+      QStackedWidget into watch_section (fixing `pane_stack.currentWidget()` to history first
+      when needed), and `vsplitter.insertWidget(0, pane_stack)` when returning from narrow.
+      Narrow: `root_layout.addWidget(pane_stack)` pulls it out; `pane_stack.addWidget(vars_pane)`
       reparents it back. All moves via Qt addWidget/insertWidget (atomic reparent, never
-      `setParent(None)`); permanent Python refs on self; `hasattr(self, "_wide")` guard stays.
-- [ ] Alt+V / `vars` command: narrow behavior unchanged; wide → toggle/ensure `watch_section`
+      `setParent(None)`); permanent Python refs on self; `hasattr(self, "_wide")` guard kept.
+      **Two real Qt-behavior divergences from this plan's predictions were found and fixed
+      during implementation** (both independently verified by review — see the plan's Risks
+      section, risk #1): (1) `first_time = splitter.count() == 0` was invalid — `vsplitter`
+      deliberately lingers as a collateral child of `splitter` while narrow, so `count()` is 1,
+      not 0, after any round trip, which would strand `inspector` in `root_layout` on the second
+      wide entry; fixed by keying `first_time` off `vsplitter.count() == 0` and unconditionally
+      re-seating both `vsplitter` and `inspector` into `splitter` on every wide transition. (2)
+      `vars_pane` inherited `QStackedWidget`'s explicit hidden-page flag on reparent into
+      `watch_section`, so `isVisibleTo` stayed `False` and the watch rack rendered empty; fixed
+      with an explicit `vars_pane.show()` after the reparent.
+- [x] Alt+V / `vars` command: narrow behavior unchanged; wide → toggle/ensure `watch_section`
       visibility (never `setCurrentWidget(vars_pane)` in wide — not a stack member there).
-      Persist `watch_visible` + `vsplitter_state` in `closeEvent`.
-- [ ] `_refresh_vars_pane()` on narrow→wide transition; existing refresh triggers already fire in
-      wide mode (`isVisibleTo` now normally true).
-- [ ] Compact restyle via dynamic property `compact` on vars_pane +
-      `QListWidget#varsPane[compact="true"]` QSS (unpolish/polish on change).
-- [ ] **Pre-step (offscreen)**: change the vars placeholder em-dash (~:594) to ASCII `--` before
-      any splitter work — `QSplitter.addWidget` eagerly measures descendants (the documented
-      segfault class). No test asserts that text.
-- [ ] Tests: update `test_wide_layout_splits_panes_and_evaluates` (~:549) and
-      `test_narrow_return_reverts_to_single_column` (~:565) for the new structure; new:
-      wide→narrow→wide round trip keeps vars functional; `vars` command in wide; Alt+V branch
-      behavior; setting change re-renders watch values in wide; vsplitter persistence. Other
-      vars tests run narrow — unaffected.
-- [ ] All three gates green + offscreen screenshot inspected.
-- [ ] Committed.
+      Persisted `watch_visible` (default `True`) + `vsplitter_state` in `closeEvent`.
+- [x] `_refresh_vars_pane()` on narrow→wide transition; existing `isVisibleTo`-gated refresh
+      triggers verified to work correctly in wide mode once the hidden-flag fix (above) landed.
+- [x] Compact restyle via dynamic property `compact` on vars_pane +
+      `QListWidget#varsPane[compact="true"]` QSS (unpolish/polish on change) — denser
+      `FONT_SMALL`/tighter padding vs. the regular narrow-mode styling, confirmed visually.
+- [x] **Pre-step (offscreen)**: vars placeholder em-dash changed to ASCII `--` before any
+      splitter work, verified green before proceeding.
+- [x] Tests (10 new/rewritten): `test_wide_layout_splits_panes_and_evaluates` and
+      `test_narrow_return_reverts_to_single_column` rewritten for the real nested-splitter tree;
+      wide→narrow→wide round trip keeps vars functional (incl. a regression guard added
+      post-review: `inspector.parent() is splitter` + `splitter.count() == 2` after the *second*
+      wide entry specifically, the exact failure mode of divergence #1 — the fix's author
+      confirmed this assertion fails without the fix by temporarily reverting it); `vars`
+      command in wide; Alt+V toggle in wide; setting-change re-renders the watch rack (the
+      regression guard for divergence #2); vsplitter/watch_visible persistence. Other vars tests
+      run narrow — unaffected, needed zero changes.
+- [x] All three gates green (233 tests, ruff clean, mypy clean) + offscreen screenshots inspected
+      (wide: VARIABLES caption + compact watch rack beside the inspector; narrow: same variables
+      shown via Alt+V/`vars` inside the pane stack at regular size — compact-vs-regular contrast
+      confirmed visually).
+- [x] Committed: `4fe2b89` "Add wide-mode variables watch rack", `dc542c1` "Strengthen wide-mode
+      round-trip test to guard inspector re-seating" (post-review fix for an Important finding:
+      the inspector-stranding regression from divergence #1 had no dedicated test).
+
+Note: this WP's implementer also added its own CHANGELOG entry (reconciled into the single
+consolidated entry below rather than duplicated).
 
 ## Cross-cutting
 
