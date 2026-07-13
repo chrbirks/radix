@@ -166,6 +166,15 @@ def test_only_result_readout_has_sunken_background(qtbot) -> None:  # type: igno
     assert "background" not in intview_block
 
 
+def test_theme_mode_icon_renders_for_every_mode(qtbot) -> None:  # type: ignore[no-untyped-def]
+    from radix.ui_qt.theme import THEME_MODES, theme_mode_icon
+
+    for mode in THEME_MODES:
+        icon = theme_mode_icon(mode, "#A9B7C6")
+        pixmap = icon.pixmap(16, 16)
+        assert not pixmap.isNull()
+
+
 def test_zone_captions_have_expected_text(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     assert window.inspector.trace_caption.text() == "TRACE"
     assert window.intview.readout_caption.text() == "READOUT"
@@ -857,6 +866,45 @@ def test_inspector_visibility_persists_across_windows(qtbot, tmp_path) -> None: 
     win3 = MainWindow(Session(), LIGHT)  # store=None: defaults, settings untouched
     qtbot.addWidget(win3)
     assert win3.inspector.isVisibleTo(win3)
+
+
+def test_theme_mode_cycles_auto_light_dark(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert window.theme_mode == "auto"
+    window._cycle_theme_mode()
+    assert window.theme_mode == "light"
+    window._cycle_theme_mode()
+    assert window.theme_mode == "dark"
+    window._cycle_theme_mode()
+    assert window.theme_mode == "auto"
+
+
+def test_theme_mode_change_invokes_callback(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    calls = []
+    window.on_theme_mode_changed = lambda: calls.append(window.theme_mode)
+    window._cycle_theme_mode()
+    assert calls == ["light"]
+
+
+def test_theme_mode_persists_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+
+    win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win1)
+    win1._cycle_theme_mode()  # auto -> light
+    win1._cycle_theme_mode()  # light -> dark
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win2)
+    assert win2.theme_mode == "dark"
+
+    win3 = MainWindow(Session(), LIGHT)  # store=None: defaults, settings untouched
+    qtbot.addWidget(win3)
+    assert win3.theme_mode == "auto"
 
 
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]

@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import time
+from collections.abc import Callable
 
 from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QAction, QKeyEvent, QKeySequence
@@ -47,7 +48,7 @@ from radix.ui_qt.history_model import (
 from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
-from radix.ui_qt.theme import LABEL_FAMILY, Palette
+from radix.ui_qt.theme import LABEL_FAMILY, THEME_MODES, Palette, theme_mode_icon
 from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
 PREVIEW_DEBOUNCE_MS = 100
@@ -62,7 +63,8 @@ SHORTCUT_HELP = """Keyboard shortcuts
   Alt+B        result base       Alt+T        always on top
   Alt+V        variables pane    del <name>   remove a variable
   Alt+P        pin last result as a channel
-  Alt+I        show/hide inspector panel"""
+  Alt+I        show/hide inspector panel
+  Alt+M        cycle theme (auto/light/dark)"""
 
 
 class MainWindow(QMainWindow):
@@ -78,6 +80,8 @@ class MainWindow(QMainWindow):
         self._help_overview_shown = False
         self._did_initial_show = False
         self.last_result_text = ""
+        self.theme_mode = "auto"  # "auto" | "light" | "dark"
+        self.on_theme_mode_changed: Callable[[], None] | None = None
 
         self.setWindowTitle(f"Radix v{__version__}")
         self.setMinimumSize(520, 600)
@@ -194,6 +198,10 @@ class MainWindow(QMainWindow):
                 self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
             if not s.value("inspector_visible", True, type=bool):
                 self.inspector.hide()
+            stored_mode = s.value("theme_mode", "auto", type=str)
+            if stored_mode in THEME_MODES:
+                self.theme_mode = stored_mode
+                self._update_theme_chip()
             channels_blob = s.value("channels")
             if channels_blob is not None:
                 with contextlib.suppress(ValueError, KeyError, TypeError):
@@ -231,6 +239,14 @@ class MainWindow(QMainWindow):
             chip.clicked.connect(handler)
             bar.addPermanentWidget(chip)
             self.status_items[key] = chip
+        self.theme_chip = QToolButton()
+        self.theme_chip.setProperty("class", "modeChip")
+        self.theme_chip.setAutoRaise(True)
+        self.theme_chip.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.theme_chip.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.theme_chip.clicked.connect(self._cycle_theme_mode)
+        bar.addPermanentWidget(self.theme_chip)
+        self._update_theme_chip()
         help_hint = QToolButton()
         help_hint.setText("?")
         help_hint.setProperty("class", "modeChip")
@@ -256,6 +272,7 @@ class MainWindow(QMainWindow):
             ("Alt+V", self._toggle_vars),
             ("Alt+P", self._pin_last_result),
             ("Alt+I", self._toggle_inspector),
+            ("Alt+M", self._cycle_theme_mode),
         ):
             action = QAction(self)
             action.setShortcut(QKeySequence(keys))
@@ -750,6 +767,24 @@ class MainWindow(QMainWindow):
             app_settings().setValue("inspector_visible", visible)
         self._toast("inspector shown" if visible else "inspector hidden")
 
+    def _cycle_theme_mode(self) -> None:
+        self.theme_mode = THEME_MODES[(THEME_MODES.index(self.theme_mode) + 1) % len(THEME_MODES)]
+        self._update_theme_chip()
+        if self.store is not None:
+            app_settings().setValue("theme_mode", self.theme_mode)
+        self._toast(f"theme: {self.theme_mode}")
+        if self.on_theme_mode_changed is not None:
+            self.on_theme_mode_changed()
+
+    def _update_theme_chip(self) -> None:
+        self.theme_chip.setIcon(theme_mode_icon(self.theme_mode, self.palette_tokens.muted))
+        tips = {
+            "auto": "theme: following the OS — click or Alt+M",
+            "light": "theme: light (pinned) — click or Alt+M",
+            "dark": "theme: dark (pinned) — click or Alt+M",
+        }
+        self.theme_chip.setToolTip(tips[self.theme_mode])
+
     def closeEvent(self, event: object) -> None:
         if self.store is not None:
             save_session(self.session)
@@ -773,6 +808,7 @@ class MainWindow(QMainWindow):
     def apply_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
+        self._update_theme_chip()
         self.result_caption.set_palette(palette)
         self.inspector.set_palette(palette)
         self.highlighter.set_palette(palette)

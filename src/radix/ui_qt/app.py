@@ -29,12 +29,15 @@ def run_gui(session: Session) -> int:
     mono, label = theme.load_bundled_font()
 
     def apply_theme() -> None:
-        palette = theme.current_palette(app)
+        palette = theme.resolve_palette(app, window.theme_mode)
         app.setStyleSheet(theme.stylesheet(palette, mono, label))
         window.apply_palette(palette)
 
     window = MainWindow(session, theme.current_palette(app), store=HistoryStore())
-    app.styleHints().colorSchemeChanged.connect(lambda _scheme: apply_theme())
-    apply_theme()
+    window.on_theme_mode_changed = apply_theme
+    app.styleHints().colorSchemeChanged.connect(
+        lambda _scheme: apply_theme() if window.theme_mode == "auto" else None
+    )
+    apply_theme()  # re-resolves once more now that a persisted theme_mode is loaded
     window.show()
     return app.exec()

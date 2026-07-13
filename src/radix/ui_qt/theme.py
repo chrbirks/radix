@@ -15,11 +15,15 @@ Plex Sans Condensed SemiBold, uppercase micro-labels only).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from importlib import resources
 
-from PySide6.QtGui import QFontDatabase, QIcon, QPixmap
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QFontDatabase, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import QApplication
+
+THEME_MODES = ("auto", "light", "dark")
 
 
 @dataclass(frozen=True)
@@ -149,6 +153,51 @@ def load_app_icon() -> QIcon:
         # Read pixel data now, inside the context — `path` may point at a
         # temp-extracted file that as_file removes once the block exits.
         pixmap = QPixmap(str(path))
+    return QIcon(pixmap)
+
+
+def theme_mode_icon(mode: str, color: str, size: int = 16) -> QIcon:
+    """Sun / moon / half-and-half glyph for the theme-mode status chip.
+
+    Drawn with QPainter primitives rather than a Unicode sun/moon character:
+    QFontMetrics segfaults under QT_QPA_PLATFORM=offscreen measuring glyphs
+    the bundled fonts don't cover (see CLAUDE.md), and neither bundled face
+    is guaranteed to ship "☀"/"☾".
+    """
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    ink = QColor(color)
+    cx, cy = size / 2, size / 2
+    r = size * 0.28
+    if mode == "light":
+        painter.setBrush(ink)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(QPointF(cx, cy), r, r)
+        painter.setPen(QPen(ink, 1.4))
+        for i in range(8):
+            angle = (math.pi / 4) * i
+            x1, y1 = cx + (r + 2) * math.cos(angle), cy + (r + 2) * math.sin(angle)
+            x2, y2 = cx + (r + 5) * math.cos(angle), cy + (r + 5) * math.sin(angle)
+            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+    elif mode == "dark":
+        disc = QPainterPath()
+        disc.addEllipse(QPointF(cx, cy), r, r)
+        bite = QPainterPath()
+        bite.addEllipse(QPointF(cx + r * 0.6, cy - r * 0.4), r, r)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(ink)
+        painter.drawPath(disc.subtracted(bite))
+    else:  # auto: half-filled disc, split down the middle
+        rect = QRectF(cx - r, cy - r, 2 * r, 2 * r)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(ink)
+        painter.drawPie(rect, 90 * 16, 180 * 16)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(ink, 1.4))
+        painter.drawEllipse(rect)
+    painter.end()
     return QIcon(pixmap)
 
 
@@ -352,7 +401,14 @@ def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
 
 
 def current_palette(app: QApplication) -> Palette:
-    from PySide6.QtCore import Qt
-
     scheme = app.styleHints().colorScheme()
     return DARK if scheme == Qt.ColorScheme.Dark else LIGHT
+
+
+def resolve_palette(app: QApplication, mode: str) -> Palette:
+    """`mode` is one of THEME_MODES: "auto" follows the OS, else pinned."""
+    if mode == "light":
+        return LIGHT
+    if mode == "dark":
+        return DARK
+    return current_palette(app)

@@ -9,6 +9,17 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Added
+
+- Alt+M (or a new status-bar chip) cycles the theme through auto / light /
+  dark. "Auto" follows the OS color scheme as before (and keeps reacting
+  live to OS theme changes); light/dark pin an explicit choice, persisted
+  across restarts, shown as a sun/moon/half-and-half icon drawn with
+  QPainter primitives rather than a Unicode glyph (the bundled fonts aren't
+  guaranteed to cover "☀"/"☾", and this codebase has hit real
+  QFontMetrics segfaults under QT_QPA_PLATFORM=offscreen from exactly this
+  class of missing-glyph fallback before).
+
 ## [4] - 2026-07-13
 
 ### Added
