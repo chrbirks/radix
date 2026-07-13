@@ -9,6 +9,8 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+## [3] - 2026-07-13
+
 ### Added
 
 - Channels rack: pin up to 8 values — from a history entry's right-click menu,
