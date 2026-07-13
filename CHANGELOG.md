@@ -9,6 +9,13 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Fixed
+
+- The hex-digit label above each nibble in the register view's bit grid was
+  clipped 1px at the top on every row — the strip it's drawn in was exactly
+  as tall as the font's reserved ascent, with no room to spare. Widened the
+  strip (`HEX_H` 18px -> 20px).
+
 ## [3] - 2026-07-13
 
 ### Added

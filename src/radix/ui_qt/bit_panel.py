@@ -28,7 +28,7 @@ from radix.ui_qt.zones import ZoneCaption, margin_wrap
 CELL = 24
 GAP = 4
 NIBBLE_GAP = 10
-HEX_H = 18  # strip above each cell row for per-nibble hex digits
+HEX_H = 20  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
