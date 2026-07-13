@@ -189,6 +189,73 @@ def test_viz_panel_float_card(qtbot, window: MainWindow) -> None:  # type: ignor
     assert window.intview.rows["HEX"][1].text().endswith("3FC0_0000")
 
 
+def _move(widget, pos):  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QEvent
+    from PySide6.QtGui import QMouseEvent
+
+    widget.mouseMoveEvent(QMouseEvent(
+        QEvent.Type.MouseMove, pos, pos, pos,
+        Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+    ))
+
+
+def test_viz_panel_fixed_bit_hover_tooltip(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "fix(0.7071, 1, 15)")
+    panel = window.vizpanel
+    payload = panel.payload
+    total = payload.m + payload.n
+    cell, y = panel._fixed_geometry(total)
+    from PySide6.QtCore import QPointF
+
+    # Sign bit is the first cell drawn (i = 0, bit = total - 1).
+    pos = QPointF(12 + cell / 2, y + cell / 2)
+    _move(panel, pos)
+    assert "sign" in panel.toolTip()
+    # Moving off the bit bar clears the tooltip.
+    _move(panel, QPointF(1, 1))
+    assert panel.toolTip() == ""
+
+
+def test_viz_panel_float_bit_hover_tooltip(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QPointF
+
+    _submit(qtbot, window, "float32(1.5)")
+    panel = window.vizpanel
+    payload = panel.payload
+    cell, y = panel._floatbits_geometry(payload.width)
+    x = 12  # i=0 -> bit = width-1 (sign), no shift
+    _move(panel, QPointF(x + cell / 2, y + cell / 2))
+    assert panel.toolTip() == "bit 31 = 0   sign"
+
+
+def test_viz_panel_clock_wave_hover_tooltip(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QPointF
+
+    from radix.ui_qt.viz_panel import LINE_H, WAVE_GAP, WAVE_ROW_H
+
+    _submit(qtbot, window, "clkdiv(96M, 12M)")  # divisor small enough to draw the wave
+    panel = window.vizpanel
+    payload = panel.payload
+    x0, strip_w, half_units = panel._wave_geometry(payload)
+    ref_y = 8 + 2 * LINE_H + WAVE_ROW_H // 2
+    div_y = 8 + 2 * LINE_H + (WAVE_ROW_H + WAVE_GAP) + WAVE_ROW_H // 2
+    _move(panel, QPointF(x0 + 2, ref_y))
+    assert panel.toolTip().startswith("reference clock — ")
+    _move(panel, QPointF(x0 + 2, div_y))
+    assert panel.toolTip().startswith("divided output (")
+
+
+def test_viz_panel_clock_error_hover_tooltip(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "clkdiv(50M, 115200)")
+    panel = window.vizpanel
+    payload = panel.payload
+    rect = panel._clock_err_rect(payload)
+    _move(panel, rect.center())
+    tip = panel.toolTip()
+    assert "typical UART tolerance" in tip
+    assert tip.startswith("ok:") or tip.startswith("warn:") or tip.startswith("bad:")
+
+
 def test_history_context_actions(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtWidgets import QApplication
 

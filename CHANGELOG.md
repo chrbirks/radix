@@ -26,6 +26,12 @@ ambiguity to resolve about major/minor/patch.
   recalls the expression as before). The inspected row gets a highlighted
   accent bar; typing, evaluating, or Esc returns to following the live
   input/last result.
+- Trace panel (the Qm.n, IEEE-754, and clock/divider cards below the
+  register view) now responds to mouse hover: bit cells in the Qm.n and
+  float32/float64 bars show the bit index, value, and field (sign/integer/
+  fraction or sign/exponent/mantissa); the clkdiv waveform strip reports
+  high/low state per trace on hover; the color-coded frequency-error text
+  explains the ok/warn/bad thresholds.
 
 ### Changed
 

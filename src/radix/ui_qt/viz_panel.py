@@ -9,7 +9,7 @@ the current value has no payload.
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPen, QPolygonF
+from PySide6.QtGui import QColor, QFontMetrics, QMouseEvent, QPainter, QPaintEvent, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 from radix.engine.viz import ClockViz, FixedPointViz, FloatBitsViz, MemViz, VizPayload
@@ -55,6 +55,8 @@ class VizPanel(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.palette_tokens = palette
         self.payload: VizPayload | None = None
+        self._hover_tip: str | None = None
+        self.setMouseTracking(True)
         self.hide()
 
     def set_palette(self, palette: Palette) -> None:
@@ -63,6 +65,8 @@ class VizPanel(QWidget):
 
     def show_payload(self, payload: VizPayload | None) -> None:
         self.payload = payload
+        self._hover_tip = None
+        self.setToolTip("")
         if isinstance(payload, (FixedPointViz, FloatBitsViz)):
             self.setFixedHeight(8 + LINE_H + BAR_H + LINE_H + 10)
         elif isinstance(payload, ClockViz):
@@ -159,9 +163,7 @@ class VizPanel(QWidget):
             return
         assert viz.wave_high is not None and viz.wave_low is not None
         high, low = viz.wave_high, viz.wave_low
-        half_units = 4 * viz.divisor  # ref half-cycles across the strip
-        x0 = CARD_PAD + WAVE_LABEL_W
-        strip_w = min(self.width() - 2 * CARD_PAD - WAVE_LABEL_W, WAVE_STRIP_MAX_W)
+        x0, strip_w, half_units = self._wave_geometry(viz)
         px = strip_w / half_units
 
         def wave(y_row: float, spans: list[int]) -> QPolygonF:
@@ -240,11 +242,7 @@ class VizPanel(QWidget):
                          Qt.AlignmentFlag.AlignVCenter, title)
 
         # Bit-cell bar: integer band (MSB cell = sign) | point | fraction band.
-        cell = VIZ_CELL
-        need = total * (cell + VIZ_GAP) + POINT_GAP + 2 * CARD_PAD
-        if need > self.width():  # shrink to fit very wide formats
-            cell = max(5, (self.width() - 2 * CARD_PAD - POINT_GAP) // total - VIZ_GAP)
-        y = 8 + LINE_H
+        cell, y = self._fixed_geometry(total)
         for i in range(total):
             bit = total - 1 - i  # MSB first
             x = CARD_PAD + i * (cell + VIZ_GAP) + (POINT_GAP if bit < viz.n else 0)
@@ -306,11 +304,7 @@ class VizPanel(QWidget):
                          Qt.AlignmentFlag.AlignVCenter, title)
 
         # Bit-cell bar: sign | exponent | mantissa bands, a field gap between each.
-        cell = VIZ_CELL
-        need = viz.width * (cell + VIZ_GAP) + 2 * POINT_GAP + 2 * CARD_PAD
-        if need > self.width():  # shrink so 64 cells fit the minimum window
-            cell = max(4, (self.width() - 2 * CARD_PAD - 2 * POINT_GAP) // viz.width - VIZ_GAP)
-        y = 8 + LINE_H
+        cell, y = self._floatbits_geometry(viz.width)
         painter.setPen(Qt.PenStyle.NoPen)
         for i in range(viz.width):
             bit = viz.width - 1 - i  # MSB first
@@ -332,3 +326,151 @@ class VizPanel(QWidget):
         line = f"sign {viz.sign_text}   exp {viz.exponent_text}   man {viz.mantissa_text}"
         painter.drawText(QRectF(CARD_PAD, y + BAR_H, self.width() - 2 * CARD_PAD, LINE_H),
                          Qt.AlignmentFlag.AlignVCenter, line)
+
+    # -- hover tooltips -----------------------------------------------------------
+    # Geometry helpers below are shared with the matching _paint_* method so the
+    # hit-test grid never drifts from what's actually drawn.
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        tooltip = self._tooltip_at(event.position()) if self.payload is not None else None
+        if tooltip == self._hover_tip:
+            return
+        self._hover_tip = tooltip
+        self.setToolTip(tooltip or "")
+
+    def _tooltip_at(self, pos: QPointF) -> str | None:
+        if isinstance(self.payload, FixedPointViz):
+            bit = self._fixed_bit_at(self.payload, pos)
+            return None if bit is None else self._fixed_bit_tooltip(self.payload, bit)
+        if isinstance(self.payload, FloatBitsViz):
+            bit = self._floatbits_bit_at(self.payload, pos)
+            return None if bit is None else self._floatbits_bit_tooltip(self.payload, bit)
+        if isinstance(self.payload, ClockViz):
+            return self._clock_tooltip(self.payload, pos)
+        return None
+
+    def _fixed_geometry(self, total: int) -> tuple[int, int]:
+        cell = VIZ_CELL
+        need = total * (cell + VIZ_GAP) + POINT_GAP + 2 * CARD_PAD
+        if need > self.width():  # shrink to fit very wide formats
+            cell = max(5, (self.width() - 2 * CARD_PAD - POINT_GAP) // total - VIZ_GAP)
+        return cell, 8 + LINE_H
+
+    def _fixed_bit_at(self, viz: FixedPointViz, pos: QPointF) -> int | None:
+        total = viz.m + viz.n
+        cell, y = self._fixed_geometry(total)
+        for bit in range(total):
+            i = total - 1 - bit
+            x = CARD_PAD + i * (cell + VIZ_GAP) + (POINT_GAP if bit < viz.n else 0)
+            if QRectF(x, y, cell, VIZ_CELL).contains(pos):
+                return bit
+        return None
+
+    def _fixed_bit_tooltip(self, viz: FixedPointViz, bit: int) -> str:
+        state = (viz.raw >> bit) & 1
+        total = viz.m + viz.n
+        if bit == total - 1:
+            field = f"sign, weight -2^{viz.m - 1}"
+        elif bit >= viz.n:
+            field = f"integer bit, weight 2^{bit - viz.n}"
+        else:
+            field = f"fraction bit, weight 2^-{viz.n - bit}"
+        return f"bit {bit} = {state}   {field}"
+
+    def _floatbits_geometry(self, width: int) -> tuple[int, int]:
+        cell = VIZ_CELL
+        need = width * (cell + VIZ_GAP) + 2 * POINT_GAP + 2 * CARD_PAD
+        if need > self.width():  # shrink so 64 cells fit the minimum window
+            cell = max(4, (self.width() - 2 * CARD_PAD - 2 * POINT_GAP) // width - VIZ_GAP)
+        return cell, 8 + LINE_H
+
+    def _floatbits_bit_at(self, viz: FloatBitsViz, pos: QPointF) -> int | None:
+        cell, y = self._floatbits_geometry(viz.width)
+        for bit in range(viz.width):
+            i = viz.width - 1 - bit
+            if bit == viz.width - 1:
+                shift = 0
+            elif bit >= viz.man_width:
+                shift = POINT_GAP
+            else:
+                shift = 2 * POINT_GAP
+            x = CARD_PAD + i * (cell + VIZ_GAP) + shift
+            if QRectF(x, y, cell, VIZ_CELL).contains(pos):
+                return bit
+        return None
+
+    def _floatbits_bit_tooltip(self, viz: FloatBitsViz, bit: int) -> str:
+        state = (viz.bits >> bit) & 1
+        if bit == viz.width - 1:
+            field = "sign"
+        elif bit >= viz.man_width:
+            field = f"exponent bit {bit - viz.man_width}"
+        else:
+            field = f"mantissa bit {bit}"
+        return f"bit {bit} = {state}   {field}"
+
+    def _clock_tooltip(self, viz: ClockViz, pos: QPointF) -> str | None:
+        err_hit = viz.divisor is not None and viz.error_ppm is not None
+        if err_hit and self._clock_err_rect(viz).contains(pos):
+            return self._clock_err_tooltip(viz)
+        if _has_wave(viz):
+            assert viz.wave_high is not None and viz.wave_low is not None
+            x0, strip_w, half_units = self._wave_geometry(viz)
+            px = strip_w / half_units
+            for i, spans, label in (
+                (0, [1] * half_units, "reference clock"),
+                (
+                    1,
+                    [viz.wave_high, viz.wave_low, viz.wave_high, viz.wave_low],
+                    f"divided output ({viz.achieved_text}Hz)",
+                ),
+            ):
+                y_row = 8 + 2 * LINE_H + i * (WAVE_ROW_H + WAVE_GAP)
+                if QRectF(x0, y_row, strip_w, WAVE_ROW_H).contains(pos):
+                    level = self._level_at(spans, (pos.x() - x0) / px)
+                    return f"{label} — {'high' if level else 'low'}"
+        return None
+
+    def _wave_geometry(self, viz: ClockViz) -> tuple[float, float, int]:
+        assert viz.divisor is not None
+        half_units = 4 * viz.divisor
+        x0 = CARD_PAD + WAVE_LABEL_W
+        strip_w = min(self.width() - 2 * CARD_PAD - WAVE_LABEL_W, WAVE_STRIP_MAX_W)
+        return x0, strip_w, half_units
+
+    @staticmethod
+    def _level_at(spans: list[int], units: float) -> bool:
+        """Trace level at a given x position, in half-cycle units from the left edge."""
+        x = 0.0
+        level_high = True
+        for span in spans:
+            if units < x + span:
+                return level_high
+            x += span
+            level_high = not level_high
+        return level_high
+
+    def _clock_err_rect(self, viz: ClockViz) -> QRectF:
+        font = self.font()
+        font.setPixelSize(FONT_BODY)
+        fm = QFontMetrics(font)
+        left = f"/ {viz.divisor}  ->  {viz.achieved_text}Hz  (target {viz.target_text}Hz)   "
+        offset = fm.horizontalAdvance(left)
+        y = 8 + LINE_H
+        return QRectF(CARD_PAD + offset, y, self.width() - 2 * CARD_PAD - offset, LINE_H)
+
+    def _clock_err_tooltip(self, viz: ClockViz) -> str:
+        ppm = abs(viz.error_ppm or 0.0)
+        warn_pct = CLK_ERR_WARN_PPM / 10_000
+        bad_pct = CLK_ERR_BAD_PPM / 10_000
+        if ppm >= CLK_ERR_BAD_PPM:
+            level = "bad"
+        elif ppm >= CLK_ERR_WARN_PPM:
+            level = "warn"
+        else:
+            level = "ok"
+        return (
+            f"{level}: err {viz.error_text}   "
+            f"(ok <{warn_pct:.0f}%, warn {warn_pct:.0f}-{bad_pct:.0f}%, "
+            f"bad >{bad_pct:.0f}% — typical UART tolerance)"
+        )
