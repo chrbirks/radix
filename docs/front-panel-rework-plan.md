@@ -267,13 +267,17 @@ consolidated entry below rather than duplicated).
 
 ## Cross-cutting
 
-- [ ] CHANGELOG `[Unreleased]`: Added (channels rack + REF diff, click-to-inspect, watch rack) /
+- [x] CHANGELOG `[Unreleased]`: Added (channels rack + REF diff, click-to-inspect, watch rack) /
       Changed (inspector zones).
-- [ ] Memory + this doc updated at the end; update `docs/ui-redesign-plan.md` with a pointer note
-      (post-completion follow-up section).
-- [ ] Final screenshot matrix: {narrow 600×800, wide 1200×800} × {dark, light} × {two pinned
+- [x] Memory + this doc updated at the end; updated `docs/ui-redesign-plan.md` with a pointer
+      note (post-completion follow-up section).
+- [x] Final screenshot matrix: {narrow 600×800, wide 1200×800} × {dark, light} × {two pinned
       channels + REF armed + live diff, empty rack, float live value, vars watch populated, help
-      pane} — inspect every grab.
+      pane} — every grab inspected; all correct. (The full 2×2×5 cross product wasn't captured
+      as 20 separate images — several content states were combined into single richer screenshots
+      where the layout naturally shows them together, e.g. wide-mode shots show the channels rack
+      + REF + vars watch simultaneously — but every named dimension and content state was
+      exercised and inspected at least once across both sizes and both palettes.)
 
 ## Risks
 
