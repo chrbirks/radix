@@ -339,6 +339,7 @@ class IntegerView(QWidget):
 
     value_to_input = Signal(str)
     copied = Signal(str)  # human description for the status-bar toast
+    pin_requested = Signal(int)  # masked scratch value, to pin as a channel
 
     def __init__(self, palette: Palette, clipboard_setter: Callable[[str], None]) -> None:
         super().__init__()
@@ -392,6 +393,11 @@ class IntegerView(QWidget):
         to_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         to_input.clicked.connect(self._emit_to_input)
         actions.addWidget(to_input)
+        pin_btn = QPushButton("pin")
+        pin_btn.setProperty("class", "copyBtn")
+        pin_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        pin_btn.clicked.connect(self._emit_pin_requested)
+        actions.addWidget(pin_btn)
         self.delta_label = QLabel("")
         self.delta_label.setProperty("class", "deltaNote")
         self.delta_label.setToolTip("set bits gained/lost vs. the previous value")
@@ -602,3 +608,8 @@ class IntegerView(QWidget):
             self.value_to_input.emit(f"0x{self._masked_scratch:X}[{hi}:{lo}]")
         else:
             self.value_to_input.emit(f"0x{self._masked_scratch:X}")
+
+    def _emit_pin_requested(self) -> None:
+        if not self.active:
+            return
+        self.pin_requested.emit(self._masked_scratch)

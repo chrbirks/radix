@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from radix.engine.viz import VizPayload
 from radix.ui_qt.bit_panel import IntegerView
+from radix.ui_qt.channels import ChannelsRack
 from radix.ui_qt.theme import Palette
 from radix.ui_qt.viz_panel import CARD_PAD, VizPanel
 from radix.ui_qt.zones import ZoneCaption, margin_wrap
@@ -26,6 +27,9 @@ class Inspector(QWidget):
         self.vizpanel = VizPanel(palette)
         self.trace_caption.hide()
         self.intview = IntegerView(palette, clipboard_setter)
+        self.channels_caption = ZoneCaption("CHANNELS")
+        self.channels_caption.set_palette(palette)
+        self.channels = ChannelsRack(palette, clipboard_setter)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -33,6 +37,8 @@ class Inspector(QWidget):
         layout.addWidget(margin_wrap(self.trace_caption, CARD_PAD))
         layout.addWidget(self.vizpanel)
         layout.addWidget(self.intview)
+        layout.addWidget(margin_wrap(self.channels_caption, 12))
+        layout.addWidget(self.channels)
         layout.addStretch(1)
 
     def show_viz_payload(self, payload: VizPayload | None) -> None:
@@ -43,3 +49,5 @@ class Inspector(QWidget):
         self.trace_caption.set_palette(palette)
         self.intview.set_palette(palette)
         self.vizpanel.set_palette(palette)
+        self.channels_caption.set_palette(palette)
+        self.channels.set_palette(palette)

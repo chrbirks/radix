@@ -684,3 +684,118 @@ def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # t
     assert grid._bits_per_row() == 32
     assert grid._rows() == 1
     assert all(grid._cell_rect(b).right() <= wide for b in range(32))
+
+
+def test_empty_rack_shows_hint(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert window.channels.channels == []
+    assert not window.channels.hint_label.isHidden()
+    assert window.channels.hint_label.text() == "no channels -- Alt+P pins the last result"
+
+
+def test_pin_via_history_context_menu(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF + 1")
+    window._history_action("pin", 0)
+    assert len(window.channels.channels) == 1
+    assert window.channels.channels[0].label == "C1"
+    assert window.channels.hint_label.isHidden()
+
+
+def test_pin_assignment_uses_variable_name(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "x = 5")
+    window._history_action("pin", 0)
+    assert window.channels.channels[0].label == "x"
+
+
+def test_alt_p_pins_last_result(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert window.session.ans is None
+    window._pin_last_result()
+    assert window.channels.channels == []
+    assert window.toast_label.text() == "nothing to pin"
+
+    _submit(qtbot, window, "3 + 4")
+    window._pin_last_result()
+    assert len(window.channels.channels) == 1
+    assert window.channels.channels[0].label == "C1"
+    assert window.toast_label.text() == "pinned C1"
+
+
+def test_channel_rack_caps_at_max_channels(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.engine.values import Value
+
+    for i in range(8):
+        window._pin_value(Value(i), None)
+    assert len(window.channels.channels) == 8
+    window._pin_value(Value(99), None)
+    assert len(window.channels.channels) == 8
+    assert window.toast_label.text() == "channel rack full -- unpin one"
+
+
+def test_base_cycle_reformats_pinned_channel(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.engine.values import Value
+
+    window._pin_value(Value(255), None)
+    before = window.channels.channels[0].text
+    window._cycle_int_base()  # dec -> hex
+    after = window.channels.channels[0].text
+    assert before != after
+
+
+def test_channel_to_input_inserts_masked_hex(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.engine.values import Value
+
+    window._pin_value(Value(255), None)
+    strip = window.channels._strips[0]
+    strip._send_to_input()
+    assert window.input.text() == "0xFF"
+
+
+def test_unpin_frees_slot(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.engine.values import Value
+
+    window._pin_value(Value(1), None)
+    window._pin_value(Value(2), None)
+    assert len(window.channels.channels) == 2
+    window.channels.unpin(0)
+    assert len(window.channels.channels) == 1
+    assert window.channels.channels[0].label == "C2"  # not renumbered
+
+
+def test_channels_persist_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+
+    win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "0xFF + 1")
+    win1._pin_last_result()  # int channel "C1"
+    _submit(qtbot, win1, "sin(1)")
+    win1._pin_last_result()  # text-only float channel "C2"
+    assert len(win1.channels.channels) == 2
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win2)
+    assert len(win2.channels.channels) == 2
+    int_chan = win2.channels.channels[0]
+    text_chan = win2.channels.channels[1]
+    assert int_chan.label == "C1"
+    assert int_chan.value is not None
+    assert int_chan.value.number == 256
+    assert text_chan.label == "C2"
+    assert text_chan.value is None
+    assert text_chan.text == win1.channels.channels[1].text
+    # A restored int channel reformats on a subsequent base cycle.
+    before = win2.channels.channels[0].text
+    win2._cycle_int_base()
+    assert win2.channels.channels[0].text != before
+
+    # A fresh settings file with no prior "channels" key constructs an empty rack.
+    empty_settings = tmp_path / "empty"
+    empty_settings.mkdir()
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(empty_settings))
+    win3 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history3.jsonl"))
+    qtbot.addWidget(win3)
+    assert win3.channels.channels == []

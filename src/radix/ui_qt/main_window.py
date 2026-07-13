@@ -10,6 +10,8 @@ Session — the UI never computes anything itself.
 
 from __future__ import annotations
 
+import contextlib
+import json
 import time
 
 from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
@@ -56,7 +58,8 @@ SHORTCUT_HELP = """Keyboard shortcuts
   Alt+D        toggle deg/rad    Alt+N        cycle notation
   Alt+B        result base       Alt+T        always on top
   Alt+V        variables pane    del <name>   remove a variable
-  Alt+E        expand/collapse zero rows in the register view"""
+  Alt+E        expand/collapse zero rows in the register view
+  Alt+P        pin last result as a channel"""
 
 
 class MainWindow(QMainWindow):
@@ -129,8 +132,12 @@ class MainWindow(QMainWindow):
         self.inspector = Inspector(palette, lambda text: QApplication.clipboard().setText(text))
         self.vizpanel = self.inspector.vizpanel
         self.intview = self.inspector.intview
+        self.channels = self.inspector.channels
         self.intview.value_to_input.connect(self._set_input)
         self.intview.copied.connect(self._toast)
+        self.intview.pin_requested.connect(lambda n: self._pin_value(Value(n), None))
+        self.channels.to_input.connect(self._set_input)
+        self.channels.copied.connect(self._toast)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
@@ -167,6 +174,14 @@ class MainWindow(QMainWindow):
             if s.value("always_on_top", False, type=bool):
                 self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
             self._pending_splitter_state = s.value("splitter_state")
+            channels_blob = s.value("channels")
+            if channels_blob is not None:
+                with contextlib.suppress(ValueError, KeyError, TypeError):
+                    self.channels.restore(
+                        json.loads(channels_blob),
+                        self.session.format_value,
+                        self.session.word_size,
+                    )
 
         self.intview.show_value(None, session.word_size, session.signed)
         self.input.setFocus()
@@ -219,6 +234,7 @@ class MainWindow(QMainWindow):
             ("Alt+T", self._toggle_always_on_top),
             ("Alt+V", self._toggle_vars),
             ("Alt+E", self._toggle_bit_grid_expanded),
+            ("Alt+P", self._pin_last_result),
         ):
             action = QAction(self)
             action.setShortcut(QKeySequence(keys))
@@ -452,6 +468,9 @@ class MainWindow(QMainWindow):
             add("copy as hex", "copy_hex")
             add("copy as dec", "copy_dec")
             add("copy as bin", "copy_bin")
+        if entry.value is not None:
+            menu.addSeparator()
+            add("pin as channel", "pin")
         menu.addSeparator()
         add("recall", "recall")
         add("delete entry", "delete")
@@ -479,6 +498,9 @@ class MainWindow(QMainWindow):
             self.model.remove(row)
             self._persist_history()
             self._toast("entry deleted")
+        elif action == "pin" and entry.value is not None:
+            label = entry.prefix.partition(" ←")[0] if entry.prefix else None
+            self._pin_value(entry.value, label)
 
     def _persist_history(self) -> None:
         if self.store is None:
@@ -518,6 +540,22 @@ class MainWindow(QMainWindow):
         self.input.setText(text)
         self.input.setFocus()
 
+    # -- channels rack ------------------------------------------------------------
+
+    def _pin_value(self, value: Value, label: str | None) -> None:
+        text = self.session.format_value(value)
+        assigned = self.channels.pin(value, text, label)
+        if assigned is None:
+            self._toast("channel rack full -- unpin one")
+        else:
+            self._toast(f"pinned {assigned}")
+
+    def _pin_last_result(self) -> None:
+        if self.session.ans is None:
+            self._toast("nothing to pin")
+            return
+        self._pin_value(self.session.ans, None)
+
     # -- settings toggles --------------------------------------------------------
 
     def _cycle_word_size(self) -> None:
@@ -543,6 +581,7 @@ class MainWindow(QMainWindow):
     def _after_setting_change(self) -> None:
         self._refresh_status()
         self._reformat_history()
+        self.channels.refresh(self.session.format_value, self.session.word_size)
         if self.vars_pane.isVisibleTo(self):
             self._refresh_vars_pane()  # values honor the new base/notation
         if self.store is not None:
@@ -671,6 +710,7 @@ class MainWindow(QMainWindow):
             app_settings().setValue("geometry", self.saveGeometry())
             if self.splitter.count() > 0:
                 app_settings().setValue("splitter_state", self.splitter.saveState())
+            app_settings().setValue("channels", json.dumps(self.channels.to_json()))
         super().closeEvent(event)  # type: ignore[arg-type]
 
     def _toast(self, message: str) -> None:

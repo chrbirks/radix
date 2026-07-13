@@ -307,6 +307,32 @@ def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
         padding: 12px;
         font-size: {FONT_BODY}px;
     }}
+    QWidget#channelsRack {{
+        background: {p.surface_sunken};
+    }}
+    QWidget.chanStrip {{
+        border-bottom: 1px solid {p.hairline};
+    }}
+    QLabel.chanSlot {{
+        color: {p.muted};
+        font-family: "{label}";
+        font-size: {FONT_MICRO}px;
+        min-width: 26px;
+    }}
+    QLabel.chanValue {{
+        color: {p.text};
+        font-size: {FONT_UI}px;
+    }}
+    QLabel.chanHint {{
+        color: {p.muted};
+        font-size: {FONT_SMALL}px;
+        padding: 4px 12px;
+    }}
+    QLabel.refTag {{
+        color: {p.bit_changed};
+        font-family: "{label}";
+        font-size: {FONT_MICRO}px;
+    }}
     QScrollBar:vertical {{
         background: transparent;
         width: 8px;
