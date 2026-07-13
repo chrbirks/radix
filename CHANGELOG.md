@@ -44,9 +44,6 @@ ambiguity to resolve about major/minor/patch.
   phosphor green = data trace, amber = measurement cursor) and a
   "datasheet" light palette, paired with a silkscreen label face
   (IBM Plex Sans Condensed SemiBold) alongside the JetBrains Mono readout.
-- The register view's bit grid folds leading all-zero rows behind a
-  collapsed rail (click it, or Alt+E, to expand) instead of always
-  showing every row of a 64-bit word.
 - The integer panel's base rows are now generic lanes: HEX/DEC (merged
   signed reading when it differs from unsigned)/BIN/ASC (hidden when
   nothing is printable) in integer mode, HEX/SGN/EXP/MAN in float mode.
@@ -64,8 +61,14 @@ ambiguity to resolve about major/minor/patch.
   13-22px). The clock card's waveform label column was widened so its
   "T = …s" / achieved-frequency labels don't clip at the larger size.
 - The bit grid no longer outlines individual flipped bits in amber — the
-  `Δ +n -m` gained/lost note next to "-> input" already says the same
-  thing as text.
+  `Δ +n -m` gained/lost note already says the same thing as text.
+
+### Removed
+
+- The register view's "-> input" button (the bit grid already writes edits
+  to the input line as you toggle bits) and the bit grid's collapse rail for
+  leading all-zero rows (Alt+E, "click to expand") — the grid now always
+  shows every row of the current word size.
 
 ### Fixed
 

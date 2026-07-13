@@ -2,9 +2,8 @@
 
 The panel shows a *scratch* value seeded from the latest integer result.
 Clicking a bit cell toggles that bit of the scratch value, re-renders all
-bases, and writes the new value into the input line as a hex literal (the
-"-> input" button does the same on demand). A new result reseeds the scratch.
-Float results grey the panel.
+bases, and writes the new value into the input line as a hex literal. A new
+result reseeds the scratch. Float results grey the panel.
 """
 
 from __future__ import annotations
@@ -34,8 +33,6 @@ INDEX_H = 18  # strip below each cell row for bit-index labels
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
 LANE_ROWS = 4  # max simultaneous lanes (HEX/DEC/BIN/ASC, or HEX/SGN/EXP/MAN)
-RAIL_H = 22  # collapsed / collapse-affordance strip height
-COLLAPSE_THRESHOLD_ROWS = 2  # only worth collapsing when >=2 full rows are all-zero
 TOP_MARGIN = 8  # above the first row, so tall hex-digit labels don't clip the widget edge
 BOTTOM_MARGIN = 4
 
@@ -62,7 +59,6 @@ class BitGrid(QWidget):
         # (exp_width, man_width) when showing an IEEE-754 pattern: cells get
         # sign/exponent/mantissa band colors and become read-only.
         self.float_fields: tuple[int, int] | None = None
-        self.expanded = False  # user override: show all rows despite the rail
         self._hover_bit: int | None = None
         self._press_bit: int | None = None
         self._dragging = False
@@ -82,47 +78,8 @@ class BitGrid(QWidget):
         self.enabled_look = enabled
         self.changed = changed
         self.float_fields = float_fields
-        if self._leading_zero_rows() < COLLAPSE_THRESHOLD_ROWS:
-            self.expanded = False  # a value with upper bits resumes auto-collapse
         self._apply_height()
         self.update()
-
-    def toggle_expanded(self) -> None:
-        self.expanded = not self.expanded
-        self._apply_height()
-        self.update()
-
-    def _leading_zero_rows(self) -> int:
-        """Leading (MSB-side) full rows that are all-zero in value and
-        changed, and outside the selection — regardless of `expanded`."""
-        if self.float_fields is not None:
-            return 0
-        per_row = self._bits_per_row()
-        count = 0
-        for row in range(self._rows()):
-            hi_bit = self.word_size - 1 - row * per_row
-            lo_bit = max(0, self.word_size - (row + 1) * per_row)
-            row_mask = ((1 << (hi_bit - lo_bit + 1)) - 1) << lo_bit
-            if (self.value & row_mask) or (self.changed & row_mask):
-                break
-            if self.selection is not None:
-                hi, lo = self.selection
-                if not (hi < lo_bit or lo > hi_bit):
-                    break
-            count += 1
-        return count
-
-    def _collapse_eligible(self) -> bool:
-        return self._leading_zero_rows() >= COLLAPSE_THRESHOLD_ROWS
-
-    def _hidden_rows(self) -> int:
-        """Rows actually hidden behind the collapsed rail right now."""
-        if self.expanded or not self._collapse_eligible():
-            return 0
-        return self._leading_zero_rows()
-
-    def _rail_rect(self) -> QRectF:
-        return QRectF(4, TOP_MARGIN, max(0, self.width() - 8), RAIL_H - 4)
 
     def _field_of(self, bit: int) -> str:
         """"sign" / "exponent" / "mantissa" for a bit in float mode."""
@@ -145,78 +102,36 @@ class BitGrid(QWidget):
         per_row = self._bits_per_row()
         return (self.word_size + per_row - 1) // per_row
 
-    def _rail_extra(self) -> int:
-        return RAIL_H if self._collapse_eligible() else 0
-
     def _apply_height(self) -> None:
-        visible_rows = self._rows() - self._hidden_rows()
-        self.setMinimumHeight(
-            visible_rows * ROW_H + self._rail_extra() + TOP_MARGIN + BOTTOM_MARGIN
-        )
+        self.setMinimumHeight(self._rows() * ROW_H + TOP_MARGIN + BOTTOM_MARGIN)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         self._apply_height()
         super().resizeEvent(event)
 
     def _cell_rect(self, bit: int) -> QRectF:
-        """Rect for a bit index (0 = LSB). MSB is top-left.
-
-        Bits hidden behind the collapsed rail return an empty rect, so
-        `_bit_at` can never select them — a collapsed bit requires
-        expanding first.
-        """
+        """Rect for a bit index (0 = LSB). MSB is top-left."""
         per_row = self._bits_per_row()
         pos = self.word_size - 1 - bit  # 0 for MSB
         row, col = divmod(pos, per_row)
-        hidden = self._hidden_rows()
-        if row < hidden:
-            return QRectF()
-        visible_row = row - hidden
         nibble_gaps = col // 4
         x = 4 + col * (CELL + GAP) + nibble_gaps * NIBBLE_GAP
-        y = TOP_MARGIN + self._rail_extra() + visible_row * ROW_H + HEX_H
+        y = TOP_MARGIN + row * ROW_H + HEX_H
         return QRectF(x, y, CELL, CELL)
 
     def sizeHint(self) -> QSize:
-        visible_rows = self._rows() - self._hidden_rows()
-        return QSize(
-            2 * BYTE_WIDTH, visible_rows * ROW_H + self._rail_extra() + TOP_MARGIN + BOTTOM_MARGIN
-        )
-
-    def _paint_rail(self, painter: QPainter) -> None:
-        p = self.palette_tokens
-        rect = self._rail_rect()
-        painter.setPen(QPen(QColor(p.hairline), 1))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(rect, 3, 3)
-        font = painter.font()
-        font.setPixelSize(FONT_MICRO)
-        painter.setFont(font)
-        painter.setPen(QColor(p.muted))
-        if self.expanded:
-            text = "^ collapse"
-        else:
-            hidden = self._hidden_rows()
-            per_row = self._bits_per_row()
-            hi = self.word_size - 1
-            lo = self.word_size - hidden * per_row
-            text = f"… bits {hi}…{lo} = 0 — click to expand"
-        painter.drawText(rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter, text)
+        return QSize(2 * BYTE_WIDTH, self._rows() * ROW_H + TOP_MARGIN + BOTTOM_MARGIN)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         p = self.palette_tokens
-        if self._collapse_eligible():
-            self._paint_rail(painter)
         on = QColor(p.bit_on if self.enabled_look else p.bit_off)
         off = QColor(p.bit_off)
         off.setAlphaF(0.6 if not self.enabled_look else 1.0)
         field_colors = {"sign": p.float_sign, "exponent": p.float_exp, "mantissa": p.float_man}
         for bit in range(self.word_size):
             rect = self._cell_rect(bit)
-            if rect.isEmpty():
-                continue
             set_ = (self.value >> bit) & 1
             if self.float_fields is not None and self.enabled_look:
                 color = QColor(field_colors[self._field_of(bit)])
@@ -247,8 +162,6 @@ class BitGrid(QWidget):
             digit = (self.value >> (4 * nibble)) & 0xF
             msb_cell = self._cell_rect(4 * nibble + 3)
             lsb_cell = self._cell_rect(4 * nibble)
-            if msb_cell.isEmpty():
-                continue
             hex_rect = QRectF(
                 msb_cell.left(),
                 msb_cell.top() - HEX_H,
@@ -270,8 +183,6 @@ class BitGrid(QWidget):
         for bit in range(self.word_size):
             if bit % 4 == 3 or bit == 0:
                 cell = self._cell_rect(bit)
-                if cell.isEmpty():
-                    continue
                 label_rect = QRectF(cell.left() - GAP, cell.bottom() + 1, CELL + 2 * GAP, INDEX_H)
                 painter.drawText(label_rect, Qt.AlignmentFlag.AlignHCenter, str(bit))
         painter.end()
@@ -290,9 +201,6 @@ class BitGrid(QWidget):
         self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if self._collapse_eligible() and self._rail_rect().contains(event.position()):
-            self.toggle_expanded()
-            return
         if not self.enabled_look or self.float_fields is not None:  # float view: read-only
             return
         self._press_bit = self._bit_at(event.position())
@@ -389,11 +297,6 @@ class IntegerView(QWidget):
 
         actions = QHBoxLayout()
         actions.setContentsMargins(12, 0, 12, 8)
-        to_input = QPushButton("-> input")
-        to_input.setProperty("class", "copyBtn")
-        to_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        to_input.clicked.connect(self._emit_to_input)
-        actions.addWidget(to_input)
         pin_btn = QPushButton("pin")
         pin_btn.setProperty("class", "copyBtn")
         pin_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
