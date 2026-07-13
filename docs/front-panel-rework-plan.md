@@ -1,6 +1,6 @@
 # Radix front-panel rework — zones, channels/REF, live history, watch rack
 
-Status: **in progress** (WP1-WP2 done; WP3-WP5 not started). This document is self-contained: an executor (human or
+Status: **in progress** (WP1-WP3 done; WP4-WP5 not started). This document is self-contained: an executor (human or
 LLM) with no prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints
 are law.
 
@@ -107,53 +107,72 @@ Deferred Minor polish (not blocking): `main_window.py`'s Qt-quirk comment near
 `_recall_from_view` says the lock is cleared "immediately" by a double-click recall — actually
 ~100ms later via the preview debounce timer, not synchronous. Cosmetic wording nit only.
 
-## WP3 — Channels rack (pin, persist, reformat)
+## WP3 — Channels rack (pin, persist, reformat) ✅ done (commits 9ba5fee, b7b0428)
 
-- [ ] New `src/radix/ui_qt/channels.py`. Constants: `MAX_CHANNELS = 8`, `MINI_STRIP_H = 12`,
+- [x] New `src/radix/ui_qt/channels.py`. Constants: `MAX_CHANNELS = 8`, `MINI_STRIP_H = 12`,
       `MINI_CELL_GAP = 1`, `STRIP_PAD = 6`, `MINI_NIBBLE_GAP = 3`.
-- [ ] `Channel` dataclass: `label` ("C1"… lowest unused, never renumbered; or the assignment's
+- [x] `Channel` dataclass: `label` ("C1"… lowest unused, never renumbered; or the assignment's
       variable name), `value: Value | None` (None for text-only restores), `text` (re-rendered
       on settings change).
-- [ ] `MiniBitStrip(QWidget)`: paint-only single row, MSB left, cell width derived from widget
+- [x] `MiniBitStrip(QWidget)`: paint-only single row, MSB left, cell width derived from widget
       width / word_size with nibble gaps; set = `bit_on`, clear = `bit_off`; fixed
       `MINI_STRIP_H`; **no text, no metrics, no mouse**.
-- [ ] `ChannelStrip(QWidget)`: composed QLabels (`chanSlot` silkscreen / `chanValue` / hidden
+- [x] `ChannelStrip(QWidget)`: composed QLabels (`chanSlot` silkscreen / `chanValue` / hidden
       `refTag` amber) over a MiniBitStrip (hidden for non-ints); left-click emits `clicked`
       (arms REF in WP4); custom context menu.
-- [ ] `ChannelsRack(QWidget)` (`#channelsRack`): owns `channels`, `ref_index`, `word_size`; empty
+- [x] `ChannelsRack(QWidget)` (`#channelsRack`): owns `channels`, `ref_index`, `word_size`; empty
       state = one muted ASCII hint line "no channels -- Alt+P pins the last result". API:
       `pin(value, text, label) -> str | None` (None when full → caller toasts), `unpin(i)`,
       `refresh(fmt, word_size)` (mirrors `HistoryModel.reformat`), `set_palette`,
       `to_json()`/`restore(blob, fmt, word_size)`; signals `to_input(str)`, `copied(str)`,
       `ref_changed()`. Context menu: `-> input` (masked hex literal for ints), copy, set/clear
-      REF, unpin.
-- [ ] `inspector.py`: CHANNELS caption + rack after intview, before the stretch.
-- [ ] Pin sources (`main_window.py`): (1) history context menu "pin as channel" when
+      REF, unpin. REF toggling is UI-live (amber tag, menu text) but fully inert outside
+      `channels.py` — nothing reads `ref_index` yet, confirmed by review; WP4 wires it up.
+- [x] `inspector.py`: CHANNELS caption + rack after intview, before the stretch.
+- [x] Pin sources (`main_window.py`): (1) history context menu "pin as channel" when
       `entry.value is not None` — label from `entry.prefix` variable name if assignment (same
       parse as delegate ~history_model.py:160); (2) a "pin" `copyBtn` in `IntegerView`'s actions
       row (bit_panel.py ~:383-398) emitting `pin_requested(int)` with `_masked_scratch` (no-op
-      when inactive); (3) `Alt+P` → `_pin_last_result` (toast when `session.ans is None`); add to
-      `_build_shortcuts` and `SHORTCUT_HELP` (keep column alignment). Shared `_pin_value(value,
-      label)` formats via `session.format_value`, toasts "pinned C1" / "channel rack full --
-      unpin one".
-- [ ] Hooks: `_after_setting_change` (~:515) calls `channels.refresh(...)`; `apply_palette`
-      covered via `inspector.set_palette`; `channels.to_input → _set_input`, `channels.copied →
-      _toast`.
-- [ ] Persistence: QSettings key `"channels"` = JSON blob `{"ref": int|null, "channels":
+      when inactive); (3) `Alt+P` → `_pin_last_result` (toast when `session.ans is None`); added
+      to `_build_shortcuts` and `SHORTCUT_HELP` (column alignment preserved). Shared
+      `_pin_value(value, label)` formats via `session.format_value`, toasts "pinned C1" /
+      "channel rack full -- unpin one". `MainWindow.channels` alias added, matching the existing
+      `vizpanel`/`intview` alias pattern.
+- [x] Hooks: `_after_setting_change` calls `channels.refresh(session.format_value,
+      session.word_size)`; palette forwarding reaches the rack; `channels.to_input → _set_input`,
+      `channels.copied → _toast`. "Copy" also writes the real system clipboard (threaded
+      `clipboard_setter`, same shape as `IntegerView`'s constructor arg).
+- [x] Persistence: QSettings key `"channels"` = JSON blob `{"ref": int|null, "channels":
       [{"label","kind":"int","int":…} | {"label","kind":"text","text":…}]}` (json handles big
-      ints); save in `closeEvent` inside the store guard; restore in `__init__` beside
-      geometry/splitter state, swallowing `ValueError/KeyError/TypeError` (settings.py
-      convention). Int channels reconstruct `Value(number)` so they reformat/diff; non-ints
-      restore text-only.
-- [ ] Theme: new QSS selectors `#channelsRack`, `QLabel.chanSlot`, `.chanValue`, `.chanHint`,
-      `.refTag` (amber, silkscreen).
-- [ ] Tests (~8): pin via `_history_action("pin", row)` (labels C1/variable name); Alt+P handler;
-      MAX_CHANNELS cap; base-cycle re-renders text; `-> input` inserts hex literal; unpin frees
-      the slot; persistence round-trip incl. a text-only float channel (two-window pattern like
-      `test_settings_persist_across_windows` ~:514); empty-rack hint. Store-backed tests must
-      tolerate a missing "channels" key.
-- [ ] All three gates green + offscreen screenshot inspected.
-- [ ] Committed.
+      ints); saved in `closeEvent` inside the store guard; restored in `__init__` beside
+      geometry/splitter state, swallowing `ValueError/KeyError/TypeError`. `restore()` builds
+      into a local list and only assigns `self.channels`/`self.ref_index` after the full loop
+      succeeds, so a corrupt blob fails atomically (never partially applied) — confirmed by a
+      dedicated regression test (fix commit). Int channels reconstruct `Value(number)` so they
+      reformat/diff; non-ints restore text-only.
+- [x] Theme: new QSS selectors `#channelsRack`, `QLabel.chanSlot`, `.chanValue`, `.chanHint`,
+      `.refTag` (amber via `bit_changed`, silkscreen), plus `QWidget.chanStrip` (hairline
+      per-strip separator, beyond the brief's exact list — judged to read more like a
+      scope-channel list than a heavy fill).
+- [x] Tests (10): pin via `_history_action("pin", row)` (labels C1/variable name); Alt+P handler
+      incl. no-`ans` no-op; MAX_CHANNELS cap (8 succeed, 9th fails); base-cycle re-renders text;
+      `-> input` inserts hex literal; unpin frees the slot without renumbering survivors;
+      persistence round-trip incl. a text-only float channel (two-window pattern) + a
+      missing-key window; empty-rack hint; corrupt-blob-falls-back-to-empty-rack (added in the
+      post-review fix).
+- [x] All three gates green (222 tests, ruff clean, mypy clean) + offscreen screenshots inspected
+      (light/dark, empty/pinned — mini bit strips only on int channels, CHANNELS caption aligned
+      with READOUT/REGISTER).
+- [x] Committed: `9ba5fee` "Add channels rack: pin, persist, reformat", `b7b0428` "Add regression
+      test for corrupt channels-blob persistence" (post-review fix for an Important finding: no
+      test exercised a genuinely corrupt, as opposed to merely missing, persisted blob).
+
+Deferred Minor polish (not blocking): `MINI_CELL_GAP` constant declared but unused in
+`MiniBitStrip.paintEvent` (cells render edge-to-edge, unlike `BitGrid`'s per-cell gap); no test
+for the unpin-then-repin label-reuse edge case (logic verified correct by code review); restored
+`ref_index` isn't range-validated against the restored channel count (safe by construction,
+undocumented). **Note for WP4:** `ref_index` isn't revalidated against word_size changes or
+restricted to int-only channels — WP4 should decide the policy on REF-arming a non-int channel.
 
 ## WP4 — REF arming + Δ vs REF + XOR mini strip
 
