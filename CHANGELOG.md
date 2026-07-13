@@ -15,6 +15,11 @@ ambiguity to resolve about major/minor/patch.
   clipped 1px at the top on every row — the strip it's drawn in was exactly
   as tall as the font's reserved ascent, with no room to spare. Widened the
   strip (`HEX_H` 18px -> 20px).
+- At startup, the history pane didn't scroll all the way to the bottom.
+  `scrollToBottom()` ran right after loading persisted history, before the
+  window was ever shown — item heights (word-wrapped) depend on the real,
+  polished viewport width, which isn't final until the first show. Deferred
+  the initial scroll to a `showEvent` override that fires once.
 
 ## [3] - 2026-07-13
 

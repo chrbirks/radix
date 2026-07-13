@@ -362,6 +362,26 @@ def test_int_history_survives_delete_rewrite_and_restart(qtbot, tmp_path) -> Non
     assert win2.model.entries[0].result != before
 
 
+def test_history_scrolls_to_bottom_on_first_show(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+    for i in range(40):
+        store.append(f"{i} + 1", str(i + 1), "", value=i + 1)
+
+    win = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win)
+    scrollbar = win.history_view.verticalScrollBar()
+    # Item heights (word-wrap) depend on the real, polished viewport width,
+    # which isn't final until the window is actually shown.
+    win.show()
+    qtbot.waitExposed(win)
+    assert scrollbar.value() == scrollbar.maximum()
+
+
 def test_vars_pane_lists_and_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "x = 0xFF")
     _submit(qtbot, window, "vars")

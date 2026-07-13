@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
         self.recall_index: int | None = None
         self._inspect_locked = False
         self._help_overview_shown = False
+        self._did_initial_show = False
         self.last_result_text = ""
 
         self.setWindowTitle(f"Radix v{__version__}")
@@ -167,7 +168,6 @@ class MainWindow(QMainWindow):
                         timestamp=old.timestamp,
                     )
                 )
-            self.history_view.scrollToBottom()
             s = app_settings()
             geometry = s.value("geometry")
             if geometry is not None:
@@ -709,6 +709,15 @@ class MainWindow(QMainWindow):
             app_settings().setValue("geometry", self.saveGeometry())
             app_settings().setValue("channels", json.dumps(self.channels.to_json()))
         super().closeEvent(event)  # type: ignore[arg-type]
+
+    def showEvent(self, event: object) -> None:
+        # Item heights depend on the real (polished, visible) viewport width
+        # for word-wrap — a scrollToBottom() called before the first show
+        # lands short once layout settles, so defer it to here instead.
+        super().showEvent(event)  # type: ignore[arg-type]
+        if not self._did_initial_show:
+            self._did_initial_show = True
+            self.history_view.scrollToBottom()
 
     def _toast(self, message: str) -> None:
         self.toast_label.setText(message)
