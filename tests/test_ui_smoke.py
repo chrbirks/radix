@@ -645,9 +645,15 @@ def test_wide_layout_splits_panes_and_evaluates(qtbot, window: MainWindow) -> No
     # under the offscreen platform whenever no app-level stylesheet is
     # applied first, a pre-existing hazard unrelated to this layout logic).
     window._apply_layout(wide=True)
+    # Wide nests a vertical splitter (pane stack over the watch rack) in the
+    # left slot of the top-level splitter, with the inspector beside it.
     assert window.splitter.count() == 2
-    assert window.pane_stack.parent() is window.splitter
+    assert window.vsplitter.count() == 2
+    assert window.pane_stack.parent() is window.vsplitter
+    assert window.vsplitter.parent() is window.splitter
     assert window.inspector.parent() is window.splitter
+    assert window.watch_section.parent() is window.vsplitter
+    assert window.vars_pane.parent() is window.watch_section
     assert window.input_bar.isVisibleTo(window)
     _submit(qtbot, window, "0xFF + 1")
     assert window.model.entries[-1].result == "256"
@@ -658,11 +664,58 @@ def test_narrow_return_reverts_to_single_column(qtbot, window: MainWindow) -> No
     window._apply_layout(wide=True)
     assert window.splitter.count() == 2
     window._apply_layout(wide=False)
-    assert window.splitter.count() == 0
+    # The vsplitter lingers as an owned-but-detached subtree (never
+    # setParent(None)'d), so the splitter keeps it as its sole child; both the
+    # pane stack and inspector are pulled back into the single-column layout.
+    assert window.splitter.count() == 1
     assert window.pane_stack.parent() is not window.splitter
+    assert window.pane_stack.parent() is not window.vsplitter
     assert window.inspector.parent() is not window.splitter
+    assert window.vars_pane.parent() is window.pane_stack  # back in the stack
     _submit(qtbot, window, "1 + 1")
     assert window.model.entries[-1].result == "2"
+
+
+def test_wide_narrow_wide_keeps_watch_rack_functional(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "foo = 7")
+    window._apply_layout(wide=True)
+    assert window.vars_pane.parent() is window.watch_section
+    labels = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
+    assert any("foo = 7" in t for t in labels)
+    window._apply_layout(wide=False)
+    window._apply_layout(wide=True)
+    assert window.vars_pane.parent() is window.watch_section
+    assert window.pane_stack.count() == 2  # history + help only, vars moved out
+    labels = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
+    assert any("foo = 7" in t for t in labels)
+
+
+def test_vars_command_in_wide_mode(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window._apply_layout(wide=True)
+    window.watch_section.setVisible(False)
+    _submit(qtbot, window, "vars")
+    assert window.watch_section.isVisibleTo(window)
+    assert window.pane_stack.currentWidget() is not window.vars_pane
+    assert window.pane_stack.currentWidget() is window.history_view
+
+
+def test_alt_v_toggle_in_wide_mode(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window._apply_layout(wide=True)
+    assert window.watch_section.isVisibleTo(window)  # defaults visible
+    window._toggle_vars()
+    assert not window.watch_section.isVisibleTo(window)
+    window._toggle_vars()
+    assert window.watch_section.isVisibleTo(window)
+
+
+def test_setting_change_rerenders_watch_in_wide(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "n = 255")
+    window._apply_layout(wide=True)
+    before = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
+    assert any("n = 255" in t for t in before)
+    window._cycle_int_base()  # dec -> hex
+    after = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
+    assert any("0xff" in t.lower() for t in after)
 
 
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -840,6 +893,39 @@ def test_unpin_frees_slot(qtbot, window: MainWindow) -> None:  # type: ignore[no
     window.channels.unpin(0)
     assert len(window.channels.channels) == 1
     assert window.channels.channels[0].label == "C2"  # not renumbered
+
+
+def test_vsplitter_and_watch_visible_persist_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+
+    win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win1)
+    win1.resize(1000, 800)
+    win1._apply_layout(wide=True)
+    win1.vsplitter.setSizes([300, 120])
+    win1._toggle_vars()  # hide the watch rack
+    assert not win1.watch_section.isVisibleTo(win1)
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win2)
+    assert win2._watch_visible is False
+    assert win2._pending_vsplitter_state is not None
+    win2.resize(1000, 800)
+    win2._apply_layout(wide=True)
+    assert not win2.watch_section.isVisibleTo(win2)  # hidden state honored
+
+    # A fresh settings file defaults watch_visible to True.
+    empty_settings = tmp_path / "empty"
+    empty_settings.mkdir()
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(empty_settings))
+    win3 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history3.jsonl"))
+    qtbot.addWidget(win3)
+    assert win3._watch_visible is True
 
 
 def test_channels_persist_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]

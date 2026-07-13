@@ -45,6 +45,7 @@ from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
 from radix.ui_qt.theme import LABEL_FAMILY, Palette
+from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
 PREVIEW_DEBOUNCE_MS = 100
 WIDE_BREAKPOINT = 900  # splitter (pane stack | inspector) above this width
@@ -143,6 +144,21 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         self._pending_splitter_state: object | None = None
+
+        # Wide mode nests a vertical splitter (pane stack over an always-visible
+        # variables watch rack) inside the left slot of `splitter`.
+        self.vsplitter = QSplitter(Qt.Orientation.Vertical)
+        self.vsplitter.setChildrenCollapsible(False)
+        self._pending_vsplitter_state: object | None = None
+        self._watch_visible = True
+        self.watch_caption = ZoneCaption("VARIABLES")
+        self.watch_caption.set_palette(palette)
+        self.watch_section = QWidget()
+        self._watch_layout = QVBoxLayout(self.watch_section)
+        self._watch_layout.setContentsMargins(0, 0, 0, 0)
+        self._watch_layout.setSpacing(0)
+        self._watch_layout.addWidget(margin_wrap(self.watch_caption, 8))
+
         self._apply_layout(wide=False)
         self.setCentralWidget(root)
 
@@ -175,6 +191,8 @@ class MainWindow(QMainWindow):
             if s.value("always_on_top", False, type=bool):
                 self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
             self._pending_splitter_state = s.value("splitter_state")
+            self._pending_vsplitter_state = s.value("vsplitter_state")
+            self._watch_visible = bool(s.value("watch_visible", True, type=bool))
             channels_blob = s.value("channels")
             if channels_blob is not None:
                 with contextlib.suppress(ValueError, KeyError, TypeError):
@@ -258,18 +276,43 @@ class MainWindow(QMainWindow):
         for w in (self.pane_stack, self.inspector, self.input_bar, self.splitter):
             self.root_layout.removeWidget(w)
         if wide:
-            first_time = self.splitter.count() == 0
+            # The vsplitter never leaves the splitter once built (it lingers as
+            # a detached-but-owned subtree while narrow), so its emptiness — not
+            # the splitter's — is the reliable "first ever wide entry" signal.
+            first_time = self.vsplitter.count() == 0
             if first_time:
-                self.splitter.addWidget(self.pane_stack)
-                self.splitter.addWidget(self.inspector)
+                self.vsplitter.addWidget(self.pane_stack)
+                self.vsplitter.addWidget(self.watch_section)
+            # Move vars_pane out of the stack into the watch rack. A stack must
+            # never show a page it no longer owns, so flip to history first.
+            if self.pane_stack.currentWidget() is self.vars_pane:
+                self.pane_stack.setCurrentWidget(self.history_view)
+            self._watch_layout.addWidget(self.vars_pane)
+            # The stack hides every non-current page; vars_pane keeps that hidden
+            # flag when reparented, so the watch rack would show empty otherwise.
+            self.vars_pane.show()
+            self.vsplitter.insertWidget(0, self.pane_stack)
+            # Narrow pulled both splitter children back into root_layout, so
+            # re-seat them every wide transition (atomic reparent), not just the
+            # first — vsplitter at the top, inspector beside it.
+            self.splitter.insertWidget(0, self.vsplitter)
+            self.splitter.addWidget(self.inspector)
+            self.watch_section.setVisible(self._watch_visible)
+            self._refresh_vars_pane()
             self.root_layout.addWidget(self.splitter, 1)
             self.root_layout.addWidget(self.input_bar)
             if first_time and self._pending_splitter_state is not None:
                 self.splitter.restoreState(self._pending_splitter_state)  # type: ignore[arg-type]
+            if first_time and self._pending_vsplitter_state is not None:
+                self.vsplitter.restoreState(self._pending_vsplitter_state)  # type: ignore[arg-type]
         else:
             self.root_layout.addWidget(self.pane_stack, 1)
+            self.pane_stack.addWidget(self.vars_pane)  # reparent back into the stack
             self.root_layout.addWidget(self.input_bar)
             self.root_layout.addWidget(self.inspector)
+        self.vars_pane.setProperty("compact", wide)
+        self.vars_pane.style().unpolish(self.vars_pane)
+        self.vars_pane.style().polish(self.vars_pane)
 
     # -- evaluate / preview -------------------------------------------------------
 
@@ -661,10 +704,24 @@ class MainWindow(QMainWindow):
 
     def _show_vars(self) -> None:
         self._refresh_vars_pane()
-        self.pane_stack.setCurrentWidget(self.vars_pane)
+        if self._wide:
+            self._watch_visible = True
+            self.watch_section.setVisible(True)
+            if self.store is not None:
+                app_settings().setValue("watch_visible", True)
+        else:
+            self.pane_stack.setCurrentWidget(self.vars_pane)
 
     def _toggle_vars(self) -> None:
-        if self.vars_pane.isVisibleTo(self):
+        if self._wide:
+            visible = not self.watch_section.isVisibleTo(self)
+            self._watch_visible = visible
+            self.watch_section.setVisible(visible)
+            if visible:
+                self._refresh_vars_pane()
+            if self.store is not None:
+                app_settings().setValue("watch_visible", visible)
+        elif self.vars_pane.isVisibleTo(self):
             self._hide_help()
         else:
             self._show_vars()
@@ -675,7 +732,7 @@ class MainWindow(QMainWindow):
     def _refresh_vars_pane(self) -> None:
         self.vars_pane.clear()
         if not self.session.variables:
-            placeholder = QListWidgetItem("no variables — assign with  x = 42")
+            placeholder = QListWidgetItem("no variables -- assign with  x = 42")
             placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
             self.vars_pane.addItem(placeholder)
             return
@@ -727,6 +784,9 @@ class MainWindow(QMainWindow):
             app_settings().setValue("geometry", self.saveGeometry())
             if self.splitter.count() > 0:
                 app_settings().setValue("splitter_state", self.splitter.saveState())
+            if self.vsplitter.count() > 0:
+                app_settings().setValue("vsplitter_state", self.vsplitter.saveState())
+            app_settings().setValue("watch_visible", self._watch_visible)
             app_settings().setValue("channels", json.dumps(self.channels.to_json()))
         super().closeEvent(event)  # type: ignore[arg-type]
 
@@ -738,6 +798,7 @@ class MainWindow(QMainWindow):
         self.palette_tokens = palette
         self.delegate.set_palette(palette)
         self.inspector.set_palette(palette)
+        self.watch_caption.set_palette(palette)
         self.highlighter.set_palette(palette)
         self.completer.set_palette(palette)
         self.history_view.viewport().update()

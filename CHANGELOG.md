@@ -9,8 +9,19 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Added
+
+- Wide mode (window ≥ 900px) now shows an always-visible "VARIABLES" watch
+  rack below the history/help pane: a compact list of the current variables
+  that updates live as you assign them or change the display base/notation.
+  Alt+V (or the `vars` command) toggles the rack instead of swapping it into
+  the pane stack. Narrow mode is unchanged — vars still swap in via Alt+V.
+
 ### Changed
 
+- In wide mode the left column is a vertical splitter (history/help pane over
+  the variables watch rack) beside the inspector; the split position and the
+  rack's shown/hidden state persist across restarts.
 - Redesigned the UI around a "bench instrument" visual direction (precision
   test equipment / waveform viewer) instead of the generic dark-IDE look:
   a two-channel "instrument screen" dark palette (blue = interaction,

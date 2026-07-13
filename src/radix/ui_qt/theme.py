@@ -300,6 +300,13 @@ def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
     QListWidget#varsPane::item:hover {{
         color: {p.accent};
     }}
+    QListWidget#varsPane[compact="true"] {{
+        padding: 4px;
+        font-size: {FONT_SMALL}px;
+    }}
+    QListWidget#varsPane[compact="true"]::item {{
+        padding: 2px 4px;
+    }}
     QTextEdit#helpPane {{
         background: {p.surface};
         color: {p.text};
