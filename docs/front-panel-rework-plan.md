@@ -1,6 +1,6 @@
 # Radix front-panel rework — zones, channels/REF, live history, watch rack
 
-Status: **in progress** (WP1-WP3 done; WP4-WP5 not started). This document is self-contained: an executor (human or
+Status: **in progress** (WP1-WP4 done; WP5 not started). This document is self-contained: an executor (human or
 LLM) with no prior context can implement it. Read the repo's `CLAUDE.md` first — its constraints
 are law.
 
@@ -174,29 +174,44 @@ for the unpin-then-repin label-reuse edge case (logic verified correct by code r
 undocumented). **Note for WP4:** `ref_index` isn't revalidated against word_size changes or
 restricted to int-only channels — WP4 should decide the policy on REF-arming a non-int channel.
 
-## WP4 — REF arming + Δ vs REF + XOR mini strip
+## WP4 — REF arming + Δ vs REF + XOR mini strip ✅ done (commit 9b82a77)
 
-- [ ] `channels.py`: strip click / context menu toggles `ref_index`; armed strip shows the amber
+- [x] `channels.py`: strip click / context menu toggles `ref_index`; armed strip shows the amber
       REF tag + XOR readout label (`f"XOR 0x{(live ^ ref) & mask:X}"`, setText only) + second
       MiniBitStrip painting `(live ^ ref) & mask` in `bit_changed` amber. Rack keeps `_live: int
       | None`; `set_live(value)` re-renders extras (hidden for non-int/no live). `ref_changed`
       emitted on arm/disarm.
-- [ ] `bit_panel.py` `IntegerView`: `set_reference(label, value)` stores `self._ref: tuple[str,
-      int] | None`; `_refresh` (~:517-524) computes gained/lost from `_masked_scratch ^ (ref &
+- [x] `bit_panel.py` `IntegerView`: `set_reference(label, value)` stores `self._ref: tuple[str,
+      int] | None`; `_refresh` computes gained/lost from `_masked_scratch ^ (ref &
       mask)` and sets `delta_label` to `"Δ vs {label} +g -l"`; without REF the existing
       `self.changed` text is unchanged. **`grid_widget.set_state` keeps receiving the existing
-      vs-previous `changed` — the REF diff never reaches BitGrid.** Scratch machinery untouched.
-      XOR math is UI-presentation arithmetic (no engine change).
-- [ ] `main_window.py`: `ref_changed → _on_ref_changed` (push `set_reference` into intview,
-      `set_live` into rack); `_panel_follow` also calls `channels.set_live(number if int else
-      None)`.
-- [ ] Tests (~5): arm REF on pinned 0xFF, evaluate → Δ-vs text with counts computed in-test from
+      vs-previous `changed` — the REF diff never reaches BitGrid.** Confirmed by a dedicated
+      regression test. Scratch machinery untouched. XOR math is UI-presentation arithmetic (no
+      engine change).
+- [x] `main_window.py`: `ref_changed → _on_ref_changed` (pushes `set_reference` into intview,
+      re-pushes `set_live` into rack from the panel's current state); `_panel_follow` also calls
+      `channels.set_live(number if isinstance(number, int) else None)` on every path. A restored
+      `ref_index` syncs into `intview` right after a successful `channels.restore(...)`, inside
+      the same exception-suppressing block, so REF state doesn't need a UI interaction to take
+      effect after reload.
+- [x] Tests (6): arm REF on pinned 0xFF, evaluate → Δ-vs text with counts computed in-test from
       the XOR; **regression guard: `grid_widget.changed` still equals vs-previous diff** (the
-      reversed decision must not sneak back); XOR readout text; disarm restores plain "Δ +n -m"
-      (guards `test_changed_bits_diff_against_previous_value` ~:308); float live hides extras;
-      REF survives persistence.
-- [ ] All three gates green + offscreen screenshot inspected.
-- [ ] Committed.
+      reversed decision didn't sneak back); XOR readout text; disarm restores plain "Δ +n -m"
+      (guards `test_changed_bits_diff_against_previous_value`); float live hides extras; REF
+      survives persistence and actually syncs into `intview._ref`, not just `ref_index`.
+- [x] All three gates green (228 tests, ruff clean, mypy clean) + offscreen screenshot inspected
+      (REF tag, XOR readout, amber diff mini-strip, and intview's "Δ vs C1 +0 -4" all visible
+      together; REGISTER grid still shows the unrelated vs-previous diff, confirming it was never
+      touched by the REF diff).
+- [x] Committed: `9b82a77` "Add REF arming with XOR diff and Δ-vs-REF". Reviewed and approved on
+      the first pass, no fix round needed.
+
+Deferred Minor polish (not blocking): REF-armed-on-a-non-int-channel has no dedicated test
+(verified safe instead via a code-level "two independent gates" proof — reviewer confirmed
+neither gate depends on the other); `xor_label` shares the top row with `value_label`/`ref_tag`
+and gets visually dense at narrow widths (cosmetic); the `refTag` QSS class is reused verbatim
+for `xor_label` rather than a distinct class (fine while both are the same amber; would need
+splitting if their styling ever diverges).
 
 ## WP5 — Wide-mode variables watch rack (nested vertical splitter)
 
