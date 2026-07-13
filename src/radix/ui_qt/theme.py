@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QApplication
 class Palette:
     background: str  # chassis
     surface: str  # raised controls: input, popups, dropdowns
-    surface_sunken: str  # recessed "screen": viz panel, integer/register view
+    surface_sunken: str  # recessed "screen": the RESULT readout only
     text: str
     muted: str  # preview line, separators text, status bar
     hairline: str  # 1px separators
