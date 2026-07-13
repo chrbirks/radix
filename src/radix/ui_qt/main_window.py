@@ -138,6 +138,7 @@ class MainWindow(QMainWindow):
         self.intview.pin_requested.connect(lambda n: self._pin_value(Value(n), None))
         self.channels.to_input.connect(self._set_input)
         self.channels.copied.connect(self._toast)
+        self.channels.ref_changed.connect(self._on_ref_changed)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
@@ -182,6 +183,7 @@ class MainWindow(QMainWindow):
                         self.session.format_value,
                         self.session.word_size,
                     )
+                    self._on_ref_changed()
 
         self.intview.show_value(None, session.word_size, session.signed)
         self.input.setFocus()
@@ -384,6 +386,7 @@ class MainWindow(QMainWindow):
         """
         self.inspector.show_viz_payload(value.viz if value is not None else None)
         number = value.number if value is not None else None
+        self.channels.set_live(number if isinstance(number, int) else None)
         if isinstance(number, int):
             self.intview.show_value(number, self.session.word_size, self.session.signed)
             return
@@ -391,6 +394,20 @@ class MainWindow(QMainWindow):
         self.intview.show_value(
             None, self.session.word_size, self.session.signed, float_views=float_views
         )
+
+    def _on_ref_changed(self) -> None:
+        """Sync the armed channel (if any) into the integer panel's REF diff."""
+        ref_index = self.channels.ref_index
+        if ref_index is None:
+            self.intview.set_reference(None, None)
+        else:
+            channel = self.channels.channels[ref_index]
+            value = channel.value
+            if value is not None and isinstance(value.number, int):
+                self.intview.set_reference(channel.label, value.number)
+            else:
+                self.intview.set_reference(None, None)
+        self.channels.set_live(self.intview.scratch if self.intview.active else None)
 
     def _set_preview(self, text: str, error: bool) -> None:
         self.preview.setText(text)

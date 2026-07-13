@@ -749,6 +749,88 @@ def test_channel_to_input_inserts_masked_hex(qtbot, window: MainWindow) -> None:
     assert window.input.text() == "0xFF"
 
 
+def test_ref_arm_shows_delta_vs_channel(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._pin_last_result()  # int channel "C1"
+    window.channels._toggle_ref(0)
+    _submit(qtbot, window, "0xF0")
+    diff = 0xF0 ^ 0xFF
+    gained = (0xF0 & diff).bit_count()
+    lost = (~0xF0 & diff).bit_count()
+    assert window.intview.delta_label.text() == f"Δ vs C1 +{gained} -{lost}"
+
+
+def test_ref_diff_does_not_reach_bit_grid(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._pin_last_result()
+    window.channels._toggle_ref(0)
+    _submit(qtbot, window, "0xF0")
+    # The REF-vs text is presentation only -- the grid keeps outlining the
+    # vs-previous diff exactly as it did before REF existed.
+    mask = (1 << window.session.word_size) - 1
+    assert window.intview.changed == 0xFF ^ 0xF0
+    assert window.intview.grid_widget.changed == window.intview.changed & mask
+
+
+def test_ref_channel_shows_xor_readout(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._pin_last_result()
+    window.channels._toggle_ref(0)
+    _submit(qtbot, window, "0xF0")
+    xor = 0xF0 ^ 0xFF
+    strip = window.channels._strips[0]
+    assert strip.xor_label.text() == f"XOR 0x{xor:X}"
+    assert strip.xor_label.isVisibleTo(window)
+    assert strip.diff_strip.isVisibleTo(window)
+
+
+def test_ref_disarm_restores_plain_delta(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._pin_last_result()
+    window.channels._toggle_ref(0)
+    _submit(qtbot, window, "0xF0")
+    window.channels._toggle_ref(0)  # disarm
+    _submit(qtbot, window, "0x0F")
+    changed = window.intview.changed & ((1 << window.session.word_size) - 1)
+    gained = (window.intview._masked_scratch & changed).bit_count()
+    lost = (~window.intview._masked_scratch & changed).bit_count()
+    assert window.intview.delta_label.text() == f"Δ +{gained} -{lost}"
+    strip = window.channels._strips[0]
+    assert not strip.xor_label.isVisibleTo(window)
+    assert not strip.diff_strip.isVisibleTo(window)
+
+
+def test_ref_extras_hidden_for_float_live_value(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "0xFF")
+    window._pin_last_result()
+    window.channels._toggle_ref(0)
+    _submit(qtbot, window, "sin(1)")  # panel's live value is now a float
+    strip = window.channels._strips[0]
+    assert not strip.xor_label.isVisibleTo(window)
+    assert not strip.diff_strip.isVisibleTo(window)
+    assert window.intview.delta_label.text() == ""
+
+
+def test_ref_survives_persistence(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+
+    win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "0xFF")
+    win1._pin_last_result()  # int channel "C1"
+    win1.channels._toggle_ref(0)
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win2)
+    assert win2.channels.ref_index == 0
+    assert win2.intview._ref == ("C1", 0xFF)
+
+
 def test_unpin_frees_slot(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from radix.engine.values import Value
 

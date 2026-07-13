@@ -47,11 +47,17 @@ class MiniBitStrip(QWidget):
         self.palette_tokens = palette
         self.word_size = 64
         self.value = 0
+        self._on_color: str | None = None
         self.setFixedHeight(MINI_STRIP_H)
 
     def set_state(self, value: int, word_size: int) -> None:
         self.value = value
         self.word_size = word_size
+        self.update()
+
+    def set_color(self, color: str | None) -> None:
+        """Override the "set bit" color (None reverts to `palette.bit_on`)."""
+        self._on_color = color
         self.update()
 
     def set_palette(self, palette: Palette) -> None:
@@ -61,7 +67,7 @@ class MiniBitStrip(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         p = self.palette_tokens
-        on = QColor(p.bit_on)
+        on = QColor(self._on_color if self._on_color is not None else p.bit_on)
         off = QColor(p.bit_off)
         word_size = max(1, self.word_size)
         nibble_gaps = max(0, word_size // 4 - 1)
@@ -108,6 +114,8 @@ class ChannelStrip(QWidget):
         self.is_ref = is_ref
         self._clipboard = clipboard_setter
 
+        self._live: int | None = None
+
         self.slot_label = QLabel(channel.label)
         self.slot_label.setProperty("class", "chanSlot")
         self.value_label = QLabel(channel.text)
@@ -115,13 +123,20 @@ class ChannelStrip(QWidget):
         self.ref_tag = QLabel("REF")
         self.ref_tag.setProperty("class", "refTag")
         self.ref_tag.hide()
+        self.xor_label = QLabel("")
+        self.xor_label.setProperty("class", "refTag")
+        self.xor_label.hide()
         self.bitstrip = MiniBitStrip(palette)
+        self.diff_strip = MiniBitStrip(palette)
+        self.diff_strip.set_color(palette.bit_changed)
+        self.diff_strip.hide()
         self._update_bitstrip()
 
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         top.addWidget(self.slot_label)
         top.addWidget(self.value_label, 1)
+        top.addWidget(self.xor_label)
         top.addWidget(self.ref_tag)
 
         layout = QVBoxLayout(self)
@@ -129,6 +144,7 @@ class ChannelStrip(QWidget):
         layout.setSpacing(4)
         layout.addLayout(top)
         layout.addWidget(self.bitstrip)
+        layout.addWidget(self.diff_strip)
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -149,14 +165,39 @@ class ChannelStrip(QWidget):
         self.slot_label.setText(channel.label)
         self.value_label.setText(channel.text)
         self._update_bitstrip()
+        self._update_ref_extras()
 
     def set_ref(self, is_ref: bool) -> None:
         self.is_ref = is_ref
         self.ref_tag.setVisible(is_ref)
+        self._update_ref_extras()
+
+    def set_live(self, value: int | None) -> None:
+        self._live = value
+        self._update_ref_extras()
+
+    def _update_ref_extras(self) -> None:
+        value = self.channel.value
+        is_int = value is not None and isinstance(value.number, int)
+        if not (self.is_ref and self._live is not None and is_int):
+            self.xor_label.hide()
+            self.diff_strip.hide()
+            return
+        assert value is not None
+        mask = (1 << self.word_size) - 1
+        ref = value.number & mask
+        live = self._live & mask
+        xor = (live ^ ref) & mask
+        self.xor_label.setText(f"XOR 0x{xor:X}")
+        self.xor_label.show()
+        self.diff_strip.set_state(xor, self.word_size)
+        self.diff_strip.show()
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
         self.bitstrip.set_palette(palette)
+        self.diff_strip.set_palette(palette)
+        self.diff_strip.set_color(palette.bit_changed)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -214,6 +255,7 @@ class ChannelsRack(QWidget):
         self.channels: list[Channel] = []
         self.ref_index: int | None = None
         self.word_size = 64
+        self._live: int | None = None
 
         self.hint_label = QLabel("no channels -- Alt+P pins the last result")
         self.hint_label.setProperty("class", "chanHint")
@@ -271,6 +313,11 @@ class ChannelsRack(QWidget):
         for strip in self._strips:
             strip.set_palette(palette)
 
+    def set_live(self, value: int | None) -> None:
+        self._live = value
+        for strip in self._strips:
+            strip.set_live(value)
+
     # -- persistence ---------------------------------------------------------
 
     def to_json(self) -> dict[str, Any]:
@@ -314,6 +361,7 @@ class ChannelsRack(QWidget):
             strip.copied.connect(self.copied)
             strip.unpin_requested.connect(lambda i=i: self.unpin(i))
             strip.ref_toggled.connect(lambda i=i: self._toggle_ref(i))
+            strip.set_live(self._live)
             self.layout_.addWidget(strip)
             self._strips.append(strip)
 

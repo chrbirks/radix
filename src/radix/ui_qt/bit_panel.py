@@ -351,6 +351,7 @@ class IntegerView(QWidget):
         self.word_size = 64
         self.signed = False
         self.active = False
+        self._ref: tuple[str, int] | None = None  # armed channel: (label, value)
         self.float_mode: FloatViews | None = None  # read-only IEEE-754 display
 
         self.rows: dict[str, tuple[QLabel, QLabel]] = {}
@@ -445,6 +446,14 @@ class IntegerView(QWidget):
             self.scratch = value
         self._refresh()
 
+    def set_reference(self, label: str | None, value: int | None) -> None:
+        if label is None:
+            self._ref = None
+        else:
+            assert value is not None
+            self._ref = (label, value)
+        self._refresh()
+
     def toggle_bit(self, bit: int) -> None:
         self.grid_widget.set_selection(None)  # a bit edit invalidates the range readout
         self.scratch ^= 1 << bit
@@ -529,7 +538,14 @@ class IntegerView(QWidget):
         self._set_lanes(lanes, dimmed=not self.active)
         mask = (1 << self.word_size) - 1
         changed = self.changed & mask if self.active else 0
-        if changed:
+        if self._ref is not None and self.active:
+            ref_label, ref_value = self._ref
+            ref_masked = ref_value & mask
+            diff = self._masked_scratch ^ ref_masked
+            gained = (self._masked_scratch & diff).bit_count()
+            lost = (~self._masked_scratch & diff).bit_count()
+            self.delta_label.setText(f"Δ vs {ref_label} +{gained} -{lost}")
+        elif changed:
             gained = (self._masked_scratch & changed).bit_count()
             lost = (~self._masked_scratch & changed).bit_count()
             self.delta_label.setText(f"Δ +{gained} -{lost}")
