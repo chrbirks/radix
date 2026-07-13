@@ -74,11 +74,17 @@ diagnostics.
   hardcoded pixels.
 - QSS px fonts leave `QFont.pointSize()` at −1 — scale via
   `history_model._scaled`, never `setPointSizeF` directly.
-- `QFontMetrics.horizontalAdvance` segfaults under `QT_QPA_PLATFORM=offscreen`
-  for glyphs needing font fallback (e.g. `→` U+2192) — keep strings that get
-  measured (function summaries etc.) to ASCII plus glyphs the bundled font
-  has. Also construct `QFontMetrics(font)` yourself; `widget.fontMetrics()`
-  can dangle in PySide6.
+- `QFontMetrics` (not just `.horizontalAdvance`) segfaults under
+  `QT_QPA_PLATFORM=offscreen` for glyphs needing font fallback (e.g. `→`
+  U+2192, `←` U+2190) — keep strings that get measured *or painted* (function
+  summaries, plain-text labels) to ASCII plus glyphs the bundled font has.
+  `HistoryEntry.prefix`/`.result` store the literal `"x ← 12"` form for
+  assignments, but nothing may render that string as-is — use
+  `history_model.split_assignment(result, prefix) -> (name, value)` to get
+  the pieces around the arrow (the history delegate paints `name` as a
+  separate badge chip; the RESULT readout joins them with `=`). Also
+  construct `QFontMetrics(font)` yourself; `widget.fontMetrics()` can dangle
+  in PySide6.
 - Pyright "Import could not be resolved" diagnostics for PySide6 etc. are
   IDE-only noise (venv not detected); ruff/mypy/pytest via uv are
   authoritative.
