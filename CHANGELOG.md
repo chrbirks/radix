@@ -40,10 +40,15 @@ ambiguity to resolve about major/minor/patch.
   matching the screen-printed sections of a physical front panel.
 - Redesigned the UI around a "bench instrument" visual direction (precision
   test equipment / waveform viewer) instead of the generic dark-IDE look:
-  a two-channel "instrument screen" dark palette (blue = interaction,
-  phosphor green = data trace, amber = measurement cursor) and a
-  "datasheet" light palette, paired with a silkscreen label face
-  (IBM Plex Sans Condensed SemiBold) alongside the JetBrains Mono readout.
+  a two-channel dark palette (blue = interaction, phosphor green = data
+  trace, amber = measurement cursor) and a "datasheet" light palette,
+  paired with a silkscreen label face (IBM Plex Sans Condensed SemiBold)
+  alongside the JetBrains Mono readout.
+- Dark palette repainted as "Obsidian Depths": a deep midnight-blue chassis
+  (`#2C3E50`) replaces the earlier near-black graphite, with much higher
+  contrast text and secondary/muted text (previously ~4.4:1 against the
+  background, now ~5.4:1) — the near-black scheme read as too dark, with
+  too much grey secondary text.
 - The integer panel's base rows are now generic lanes: HEX/DEC (merged
   signed reading when it differs from unsigned)/BIN/ASC (hidden when
   nothing is printable) in integer mode, HEX/SGN/EXP/MAN in float mode.
