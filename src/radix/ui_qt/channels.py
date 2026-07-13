@@ -22,7 +22,6 @@ from radix.ui_qt.theme import Palette
 
 MAX_CHANNELS = 8
 MINI_STRIP_H = 12
-MINI_CELL_GAP = 1
 STRIP_PAD = 6
 MINI_NIBBLE_GAP = 3
 

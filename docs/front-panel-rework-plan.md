@@ -110,7 +110,8 @@ Deferred Minor polish (not blocking): `main_window.py`'s Qt-quirk comment near
 ## WP3 — Channels rack (pin, persist, reformat) ✅ done (commits 9ba5fee, b7b0428)
 
 - [x] New `src/radix/ui_qt/channels.py`. Constants: `MAX_CHANNELS = 8`, `MINI_STRIP_H = 12`,
-      `MINI_CELL_GAP = 1`, `STRIP_PAD = 6`, `MINI_NIBBLE_GAP = 3`.
+      `STRIP_PAD = 6`, `MINI_NIBBLE_GAP = 3` (an initial `MINI_CELL_GAP` was dropped as dead code
+      during the final review — see the note below).
 - [x] `Channel` dataclass: `label` ("C1"… lowest unused, never renumbered; or the assignment's
       variable name), `value: Value | None` (None for text-only restores), `text` (re-rendered
       on settings change).
@@ -167,12 +168,15 @@ Deferred Minor polish (not blocking): `main_window.py`'s Qt-quirk comment near
       test for corrupt channels-blob persistence" (post-review fix for an Important finding: no
       test exercised a genuinely corrupt, as opposed to merely missing, persisted blob).
 
-Deferred Minor polish (not blocking): `MINI_CELL_GAP` constant declared but unused in
-`MiniBitStrip.paintEvent` (cells render edge-to-edge, unlike `BitGrid`'s per-cell gap); no test
-for the unpin-then-repin label-reuse edge case (logic verified correct by code review); restored
-`ref_index` isn't range-validated against the restored channel count (safe by construction,
-undocumented). **Note for WP4:** `ref_index` isn't revalidated against word_size changes or
-restricted to int-only channels — WP4 should decide the policy on REF-arming a non-int channel.
+Deferred Minor polish (not blocking): no test for the unpin-then-repin label-reuse edge case
+(logic verified correct by code review); restored `ref_index` isn't range-validated against the
+restored channel count (safe by construction, undocumented). **Note for WP4:** `ref_index` isn't
+revalidated against word_size changes or restricted to int-only channels — WP4 should decide the
+policy on REF-arming a non-int channel.
+
+(The unused `MINI_CELL_GAP` constant noted here originally was deleted during the final
+whole-branch review closeout — it was dead and its name was misleading, implying a per-cell gap
+`MiniBitStrip` deliberately doesn't have.)
 
 ## WP4 — REF arming + Δ vs REF + XOR mini strip ✅ done (commit 9b82a77)
 
