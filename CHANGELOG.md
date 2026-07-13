@@ -9,6 +9,8 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+## [4] - 2026-07-13
+
 ### Added
 
 - A RESULT zone between history and the input bar shows the most recently
