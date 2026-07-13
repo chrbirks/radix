@@ -36,9 +36,9 @@ def test_float_result_shows_ieee754_view(qtbot, window: MainWindow) -> None:  # 
     _submit(qtbot, window, "2.5")
     assert not window.intview.active  # no integer scratch
     assert window.intview.float_mode is not None
-    assert window.intview.rows["HEX"][1].text() == "0x4004_0000_0000_0000"
+    assert window.intview.rows["HEX"][1].text() == "0x4020_0000"  # float32: default word size
     assert window.intview.rows["EXP"][0].text() == "EXP"
-    assert window.intview.rows["EXP"][1].text() == "1024 - bias 1023 = 2^1"
+    assert window.intview.rows["EXP"][1].text() == "128 - bias 127 = 2^1"
     assert "SGN" in window.intview.rows
     # 8/16-bit words have no float format: panel greys as before.
     window.session.word_size = 8
@@ -50,12 +50,22 @@ def test_float_result_shows_ieee754_view(qtbot, window: MainWindow) -> None:  # 
     assert "DEC" in window.intview.rows  # integer lanes restored
 
 
+def test_float_result_shows_float64_at_64bit_word_size(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.session.word_size = 64
+    window._update_preview()
+    _submit(qtbot, window, "2.5")
+    assert window.intview.float_mode is not None
+    assert window.intview.rows["HEX"][1].text() == "0x4004_0000_0000_0000"
+    assert window.intview.rows["EXP"][1].text() == "1024 - bias 1023 = 2^1"
+    assert window.intview.grid_widget.float_fields == (11, 52)
+
+
 def test_float_view_is_read_only(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "0xFF")
     _submit(qtbot, window, "2.5")
     assert window.intview.float_mode is not None
     grid = window.intview.grid_widget
-    assert grid.float_fields == (11, 52)
+    assert grid.float_fields == (8, 23)  # float32: default word size
     # Toggling/selecting is disabled in float mode; scratch keeps the last int.
     assert window.intview.scratch == 0xFF
 
@@ -584,7 +594,7 @@ def test_bit_toggle_marks_single_changed_bit(qtbot, window: MainWindow) -> None:
 
 def test_ascii_row(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "0x746F6B31")
-    assert window.intview.rows["ASC"][1].text() == "....tok1"
+    assert window.intview.rows["ASC"][1].text() == "tok1"  # exactly 4 bytes at 32-bit
     _submit(qtbot, window, "0xFFFF")  # no printable byte: lane hidden
     assert "ASC" not in window.intview.rows
 
@@ -602,7 +612,8 @@ def test_bin_lane_highlights_set_bits_but_copies_plain(qtbot, window: MainWindow
 
 
 def test_dec_lane_shows_signed_when_differs(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    window._cycle_word_size()  # 64 -> 8
+    window.session.word_size = 8
+    window._update_preview()
     _submit(qtbot, window, "0xFF")
     dec_text = window.intview.rows["DEC"][1].text()
     assert "255" in dec_text
@@ -653,6 +664,8 @@ def test_bit_range_drag_selects_without_toggling(qtbot, window: MainWindow) -> N
 
 
 def test_toggling_upper_bit_updates_input(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.session.word_size = 64
+    window._update_preview()
     _submit(qtbot, window, "0xFF")
     window.intview.toggle_bit(40)
     expected = 0xFF | (1 << 40)
@@ -662,9 +675,9 @@ def test_toggling_upper_bit_updates_input(qtbot, window: MainWindow) -> None:  #
 
 def test_word_size_cycle_never_masks_scratch(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "0xFF")
-    window._cycle_word_size()  # 64 -> 8: display only
+    window._cycle_word_size()  # 32 -> 64: display only
     assert window.intview.scratch == 0xFF
-    window._cycle_word_size()  # 8 -> 16
+    window._cycle_word_size()  # 64 -> 8
     assert window.intview.scratch == 0xFF
 
 
@@ -677,14 +690,15 @@ def test_copy_result_shortcut(qtbot, window: MainWindow) -> None:  # type: ignor
 
 
 def test_status_bar_cycles_word_size(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    assert window.status_items["word"].text() == "64-bit"
+    assert window.status_items["word"].text() == "32-bit"
     window._cycle_word_size()
-    assert window.session.word_size == 8
-    assert window.status_items["word"].text() == "8-bit"
+    assert window.session.word_size == 64
+    assert window.status_items["word"].text() == "64-bit"
 
 
 def test_word_size_cycling_is_display_only(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "0xFFFF")
+    window._cycle_word_size()  # 32 -> 64
     window._cycle_word_size()  # 64 -> 8: shows 0xFF
     assert window.intview.rows["HEX"][1].text() == "0xFF"
     window._cycle_word_size()  # 8 -> 16: upper bits must reappear
@@ -823,7 +837,7 @@ def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
 
     win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
     qtbot.addWidget(win1)
-    win1._cycle_word_size()  # 64 -> 8
+    win1._cycle_word_size()  # 32 -> 64
     win1._toggle_signed()
     win1._toggle_angle()
     win1._cycle_notation()  # auto -> sci
@@ -833,7 +847,7 @@ def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
 
     win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
     qtbot.addWidget(win2)
-    assert win2.session.word_size == 8
+    assert win2.session.word_size == 64
     assert win2.session.signed is True
     assert win2.session.angle_deg is True
     assert win2.session.notation == "sci"
@@ -843,7 +857,7 @@ def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
 
     win3 = MainWindow(Session(), LIGHT)  # store=None: defaults, settings untouched
     qtbot.addWidget(win3)
-    assert win3.session.word_size == 64
+    assert win3.session.word_size == 32
     assert win3.session.int_base == "dec"
 
 

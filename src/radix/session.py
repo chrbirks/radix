@@ -57,7 +57,7 @@ class Outcome:
 
 @dataclass
 class Session:
-    word_size: int = 64
+    word_size: int = 32
     signed: bool = False
     angle_deg: bool = False
     notation: str = "auto"

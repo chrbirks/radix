@@ -138,7 +138,7 @@ PRECEDENCE = [
     ("2 3", "6"),  # adjacency with space is still implicit mult
     ("+5", "5"),
     ("--5", "5"),
-    ("~0", "18446744073709551615"),
+    ("~0", "4294967295"),  # default word size is 32 bits
     ("~0", "255", {"word_size": 8}),
 ]
 

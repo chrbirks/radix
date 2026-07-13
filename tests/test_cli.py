@@ -24,4 +24,4 @@ def test_evaluate_prints_integer_views(capsys: pytest.CaptureFixture[str]) -> No
     assert main(["-e", "0xFF << 2"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("1020")
-    assert "0x0000_0000_0000_03FC" in out
+    assert "0x0000_03FC" in out

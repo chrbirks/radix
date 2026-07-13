@@ -25,6 +25,9 @@ ambiguity to resolve about major/minor/patch.
 - The version no longer appears in the window title (just "Radix" now) —
   it's shown as a small "vN" item at the far right of the status bar
   instead. Still appears in the help pane header and `--version`.
+- Default word size is now 32-bit (was 64-bit). Alt+W still cycles all four
+  sizes (8/16/32/64); a fresh session or settings-less window now starts at
+  32-bit.
 
 ## [4] - 2026-07-13
 
