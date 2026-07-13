@@ -223,11 +223,9 @@ def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
         color: {p.error};
     }}
     QWidget#intview {{
-        background: {p.surface_sunken};
         border-top: 1px solid {p.hairline};
     }}
     QWidget#vizPanel {{
-        background: {p.surface_sunken};
         border-top: 1px solid {p.hairline};
     }}
     QLabel.baseName, QLabel.laneName {{

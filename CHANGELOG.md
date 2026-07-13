@@ -19,6 +19,13 @@ ambiguity to resolve about major/minor/patch.
   evaluation, and reformats along with history when the result base,
   notation, signedness, or word size changes.
 
+### Changed
+
+- The TRACE panel (viz cards) no longer has a darker recessed background —
+  only the new RESULT readout stands out that way now. TRACE now matches
+  READOUT/REGISTER and the rest of the chassis, instead of the three
+  panels being visually inconsistent with each other.
+
 ### Fixed
 
 - The hex-digit label above each nibble in the register view's bit grid was

@@ -150,6 +150,22 @@ def test_viz_panel_shows_for_fix_and_hides_for_plain_ints(qtbot, window: MainWin
     assert window.vizpanel.isVisibleTo(window)
 
 
+def test_only_result_readout_has_sunken_background(qtbot) -> None:  # type: ignore[no-untyped-def]
+    # Only the RESULT readout should stand out with the darker surface_sunken
+    # fill -- TRACE/READOUT/REGISTER all match the plain chassis background.
+    from radix.ui_qt import theme
+    from radix.ui_qt.theme import DARK
+
+    mono, label = theme.load_bundled_font()
+    qss = theme.stylesheet(DARK, mono, label)
+    result_block = qss.split("QLabel#resultValue {")[1].split("}")[0]
+    vizpanel_block = qss.split("QWidget#vizPanel {")[1].split("}")[0]
+    intview_block = qss.split("QWidget#intview {")[1].split("}")[0]
+    assert "background" in result_block
+    assert "background" not in vizpanel_block
+    assert "background" not in intview_block
+
+
 def test_zone_captions_have_expected_text(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     assert window.inspector.trace_caption.text() == "TRACE"
     assert window.intview.readout_caption.text() == "READOUT"
