@@ -9,6 +9,8 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+## [5] - 2026-07-13
+
 ### Added
 
 - Alt+M (or a new status-bar chip) cycles the theme through auto / light /
