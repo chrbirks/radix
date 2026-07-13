@@ -18,6 +18,9 @@ ambiguity to resolve about major/minor/patch.
   last loaded history entry), shows a dimmed placeholder before the first
   evaluation, and reformats along with history when the result base,
   notation, signedness, or word size changes.
+- Alt+I shows/hides the whole inspector panel (TRACE/READOUT/REGISTER/
+  CHANNELS) — the history pane grows to fill the freed space. Persists
+  across restarts.
 
 ### Changed
 

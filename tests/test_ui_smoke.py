@@ -830,6 +830,35 @@ def test_settings_persist_across_windows(qtbot, tmp_path) -> None:  # type: igno
     assert win3.session.int_base == "dec"
 
 
+def test_toggle_inspector_shows_and_hides(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    assert window.inspector.isVisibleTo(window)
+    window._toggle_inspector()
+    assert not window.inspector.isVisibleTo(window)
+    window._toggle_inspector()
+    assert window.inspector.isVisibleTo(window)
+
+
+def test_inspector_visibility_persists_across_windows(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+
+    win1 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win1)
+    win1._toggle_inspector()  # hide it
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
+    qtbot.addWidget(win2)
+    assert not win2.inspector.isVisibleTo(win2)
+
+    win3 = MainWindow(Session(), LIGHT)  # store=None: defaults, settings untouched
+    qtbot.addWidget(win3)
+    assert win3.inspector.isVisibleTo(win3)
+
+
 def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from radix.ui_qt.bit_panel import BYTE_WIDTH
 

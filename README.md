@@ -142,6 +142,7 @@ always-on-top, window geometry — persist across restarts in a plain INI file
 | Alt+B | result base (dec/hex/bin) |
 | Alt+V | variables pane (`del <name>` removes) |
 | Alt+T | always on top |
+| Alt+I | show/hide the inspector panel |
 | Esc | dismiss help/variables pane, clear bit-range selection |
 
 `clear` wipes variables and persistent history. History is stored as JSONL in

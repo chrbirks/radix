@@ -61,7 +61,8 @@ SHORTCUT_HELP = """Keyboard shortcuts
   Alt+D        toggle deg/rad    Alt+N        cycle notation
   Alt+B        result base       Alt+T        always on top
   Alt+V        variables pane    del <name>   remove a variable
-  Alt+P        pin last result as a channel"""
+  Alt+P        pin last result as a channel
+  Alt+I        show/hide inspector panel"""
 
 
 class MainWindow(QMainWindow):
@@ -191,6 +192,8 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(geometry)
             if s.value("always_on_top", False, type=bool):
                 self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+            if not s.value("inspector_visible", True, type=bool):
+                self.inspector.hide()
             channels_blob = s.value("channels")
             if channels_blob is not None:
                 with contextlib.suppress(ValueError, KeyError, TypeError):
@@ -252,6 +255,7 @@ class MainWindow(QMainWindow):
             ("Alt+T", self._toggle_always_on_top),
             ("Alt+V", self._toggle_vars),
             ("Alt+P", self._pin_last_result),
+            ("Alt+I", self._toggle_inspector),
         ):
             action = QAction(self)
             action.setShortcut(QKeySequence(keys))
@@ -738,6 +742,13 @@ class MainWindow(QMainWindow):
         if self.store is not None:
             app_settings().setValue("always_on_top", on_top)
         self._toast("always on top" if on_top else "normal stacking")
+
+    def _toggle_inspector(self) -> None:
+        visible = not self.inspector.isVisibleTo(self)
+        self.inspector.setVisible(visible)
+        if self.store is not None:
+            app_settings().setValue("inspector_visible", visible)
+        self._toast("inspector shown" if visible else "inspector hidden")
 
     def closeEvent(self, event: object) -> None:
         if self.store is not None:
