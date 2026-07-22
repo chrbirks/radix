@@ -60,12 +60,17 @@ SHORTCUT_HELP = """Keyboard shortcuts
   F1 or help   this help         Esc          dismiss help
   Alt+W        cycle word size   Alt+S        toggle signed/unsigned
   Alt+D        toggle deg/rad    Alt+N        cycle notation
-  Alt+B        result base       Alt+T        always on top
+  Alt+Shift+B  result base       Alt+T        always on top
   Alt+V        variables pane    del <name>   remove a variable
-  Alt+F        show/hide float view (READOUT/REGISTER)
+  Alt+Shift+F  show/hide float view (READOUT/REGISTER)
   Alt+P        pin last result as a channel
   Alt+I        show/hide inspector panel
-  Alt+M        cycle theme (auto/light/dark)"""
+  Alt+M        cycle theme (auto/light/dark)
+
+  Line editing (input field)
+  Ctrl+B/F     move char back/fwd  Alt+B/F      move word back/fwd
+  Ctrl+E       end of line         Ctrl+W       delete word back
+  Ctrl+D/H     delete char fwd/back"""
 
 
 class MainWindow(QMainWindow):
@@ -283,8 +288,8 @@ class MainWindow(QMainWindow):
             ("Alt+S", self._toggle_signed),
             ("Alt+D", self._toggle_angle),
             ("Alt+N", self._cycle_notation),
-            ("Alt+B", self._cycle_int_base),
-            ("Alt+F", self._toggle_float_view),
+            ("Alt+Shift+B", self._cycle_int_base),
+            ("Alt+Shift+F", self._toggle_float_view),
             ("Alt+T", self._toggle_always_on_top),
             ("Alt+V", self._toggle_vars),
             ("Alt+P", self._pin_last_result),

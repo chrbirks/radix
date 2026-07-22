@@ -1205,3 +1205,58 @@ def test_corrupt_channels_blob_falls_back_to_empty_rack(qtbot, tmp_path) -> None
     window = MainWindow(Session(), LIGHT, store=HistoryStore(tmp_path / "history.jsonl"))
     qtbot.addWidget(window)
     assert window.channels.channels == []
+
+
+def test_ctrl_b_f_move_cursor_by_char(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.input.setText("12345")
+    qtbot.keyClick(window.input, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
+    qtbot.keyClick(window.input, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
+    assert window.input.textCursor().position() == 3
+    qtbot.keyClick(window.input, Qt.Key.Key_F, Qt.KeyboardModifier.ControlModifier)
+    assert window.input.textCursor().position() == 4
+
+
+def test_ctrl_e_moves_to_end_of_line(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.input.setText("12345")
+    cursor = window.input.textCursor()
+    cursor.movePosition(cursor.MoveOperation.Start)
+    window.input.setTextCursor(cursor)
+    qtbot.keyClick(window.input, Qt.Key.Key_E, Qt.KeyboardModifier.ControlModifier)
+    assert window.input.textCursor().position() == len("12345")
+
+
+def test_ctrl_d_h_delete_char_forward_and_backward(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.input.setText("12345")
+    cursor = window.input.textCursor()
+    cursor.setPosition(2)
+    window.input.setTextCursor(cursor)
+    qtbot.keyClick(window.input, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
+    assert window.input.text() == "1245"
+    qtbot.keyClick(window.input, Qt.Key.Key_H, Qt.KeyboardModifier.ControlModifier)
+    assert window.input.text() == "145"
+
+
+def test_ctrl_w_deletes_word_backward(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.input.setText("12 + 34")
+    qtbot.keyClick(window.input, Qt.Key.Key_W, Qt.KeyboardModifier.ControlModifier)
+    assert window.input.text() == "12 + "
+
+
+def test_alt_b_f_move_cursor_by_word(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.input.setText("12 + 34")
+    qtbot.keyClick(window.input, Qt.Key.Key_B, Qt.KeyboardModifier.AltModifier)
+    assert window.input.textCursor().position() == 5  # start of "34"
+    qtbot.keyClick(window.input, Qt.Key.Key_B, Qt.KeyboardModifier.AltModifier)
+    assert window.input.textCursor().position() == 3  # start of "+"
+    qtbot.keyClick(window.input, Qt.Key.Key_F, Qt.KeyboardModifier.AltModifier)
+    assert window.input.textCursor().position() == 5
+
+
+def test_int_base_and_float_view_shortcuts_use_alt_shift(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    # Alt+B/Alt+F were reassigned to bash-style word-jump in the input field,
+    # so the app-level toggles moved to Alt+Shift+B/F.
+    shortcuts = {action.shortcut().toString() for action in window.actions()}
+    assert "Alt+Shift+B" in shortcuts
+    assert "Alt+Shift+F" in shortcuts
+    assert "Alt+B" not in shortcuts
+    assert "Alt+F" not in shortcuts

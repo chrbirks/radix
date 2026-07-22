@@ -48,7 +48,45 @@ class InputEdit(QPlainTextEdit):
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.submitted.emit()
             return
+        mods = event.modifiers()
+        if mods == Qt.KeyboardModifier.ControlModifier and self._handle_ctrl_key(event.key()):
+            return
+        if mods == Qt.KeyboardModifier.AltModifier and self._handle_alt_key(event.key()):
+            return
         super().keyPressEvent(event)
+
+    # -- bash/readline-style line editing ----------------------------------------
+
+    def _handle_ctrl_key(self, key: int) -> bool:
+        cursor = self.textCursor()
+        if key == Qt.Key.Key_B:
+            cursor.movePosition(QTextCursor.MoveOperation.Left)
+        elif key == Qt.Key.Key_F:
+            cursor.movePosition(QTextCursor.MoveOperation.Right)
+        elif key == Qt.Key.Key_E:
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfLine)
+        elif key == Qt.Key.Key_D:
+            cursor.deleteChar()
+        elif key == Qt.Key.Key_H:
+            cursor.deletePreviousChar()
+        elif key == Qt.Key.Key_W:
+            cursor.movePosition(QTextCursor.MoveOperation.WordLeft, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+        else:
+            return False
+        self.setTextCursor(cursor)
+        return True
+
+    def _handle_alt_key(self, key: int) -> bool:
+        cursor = self.textCursor()
+        if key == Qt.Key.Key_B:
+            cursor.movePosition(QTextCursor.MoveOperation.WordLeft)
+        elif key == Qt.Key.Key_F:
+            cursor.movePosition(QTextCursor.MoveOperation.WordRight)
+        else:
+            return False
+        self.setTextCursor(cursor)
+        return True
 
     def insertFromMimeData(self, source: QMimeData) -> None:
         self.insertPlainText(" ".join(source.text().splitlines()))

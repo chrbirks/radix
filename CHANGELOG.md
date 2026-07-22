@@ -13,9 +13,16 @@ ambiguity to resolve about major/minor/patch.
 
 - The data-trace green (asserted bits, syntax-highlighted numbers, IEEE-754
   exponent band) is now blue (`#0078FF`) in both themes.
+- "Cycle integer result base" and "toggle float view" moved from Alt+B /
+  Alt+F to Alt+Shift+B / Alt+Shift+F, freeing Alt+B/F for bash-style
+  word-jump cursor movement in the input field.
 
 ### Added
 
+- Bash/readline-style line editing in the input field: Ctrl+B/F move the
+  cursor by one character, Alt+B/F by one word, Ctrl+E jumps to end of
+  line, Ctrl+D/H delete the char forward/backward, and Ctrl+W deletes the
+  word behind the cursor.
 - Alt+F (or a new "FLOAT ON/OFF" status-bar chip) toggles the IEEE-754
   breakdown that READOUT/REGISTER show for real-number results at word size
   32/64. Off by default — the panel greys instead, as it already did at
