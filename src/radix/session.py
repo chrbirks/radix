@@ -62,6 +62,7 @@ class Session:
     angle_deg: bool = False
     notation: str = "auto"
     int_base: str = "dec"  # display base for integer results (dec/hex/bin)
+    show_float_view: bool = False  # IEEE-754 breakdown in READOUT/REGISTER
     variables: dict[str, Value] = field(default_factory=dict)
     ans: Value | None = None
 

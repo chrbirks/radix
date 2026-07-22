@@ -32,7 +32,15 @@ def test_evaluate_appends_history_and_updates_panel(qtbot, window: MainWindow) -
     assert window.intview.rows["HEX"][1].text().endswith("03FC")
 
 
+def test_float_result_greys_panel_by_default(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "2.5")
+    assert window.intview.float_mode is None
+    assert not window.intview.active
+    assert "EXP" not in window.intview.rows  # float-only lanes hidden by default
+
+
 def test_float_result_shows_ieee754_view(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.session.show_float_view = True
     _submit(qtbot, window, "2.5")
     assert not window.intview.active  # no integer scratch
     assert window.intview.float_mode is not None
@@ -51,6 +59,7 @@ def test_float_result_shows_ieee754_view(qtbot, window: MainWindow) -> None:  # 
 
 
 def test_float_result_shows_float64_at_64bit_word_size(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.session.show_float_view = True
     window.session.word_size = 64
     window._update_preview()
     _submit(qtbot, window, "2.5")
@@ -61,6 +70,7 @@ def test_float_result_shows_float64_at_64bit_word_size(qtbot, window: MainWindow
 
 
 def test_float_view_is_read_only(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    window.session.show_float_view = True
     _submit(qtbot, window, "0xFF")
     _submit(qtbot, window, "2.5")
     assert window.intview.float_mode is not None

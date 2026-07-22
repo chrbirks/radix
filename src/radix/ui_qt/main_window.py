@@ -62,6 +62,7 @@ SHORTCUT_HELP = """Keyboard shortcuts
   Alt+D        toggle deg/rad    Alt+N        cycle notation
   Alt+B        result base       Alt+T        always on top
   Alt+V        variables pane    del <name>   remove a variable
+  Alt+F        show/hide float view (READOUT/REGISTER)
   Alt+P        pin last result as a channel
   Alt+I        show/hide inspector panel
   Alt+M        cycle theme (auto/light/dark)"""
@@ -230,6 +231,7 @@ class MainWindow(QMainWindow):
             ("sign", self._toggle_signed),
             ("base", self._cycle_int_base),
             ("notation", self._cycle_notation),
+            ("float", self._toggle_float_view),
         ):
             chip = QToolButton()
             chip.setProperty("class", "modeChip")
@@ -272,6 +274,7 @@ class MainWindow(QMainWindow):
             ("Alt+D", self._toggle_angle),
             ("Alt+N", self._cycle_notation),
             ("Alt+B", self._cycle_int_base),
+            ("Alt+F", self._toggle_float_view),
             ("Alt+T", self._toggle_always_on_top),
             ("Alt+V", self._toggle_vars),
             ("Alt+P", self._pin_last_result),
@@ -417,7 +420,11 @@ class MainWindow(QMainWindow):
         if isinstance(number, int):
             self.intview.show_value(number, self.session.word_size, self.session.signed)
             return
-        float_views = self.session.float_views_for(value) if value is not None else None
+        float_views = (
+            self.session.float_views_for(value)
+            if value is not None and self.session.show_float_view
+            else None
+        )
         self.intview.show_value(
             None, self.session.word_size, self.session.signed, float_views=float_views
         )
@@ -631,6 +638,10 @@ class MainWindow(QMainWindow):
         self.session.cycle_int_base()
         self._after_setting_change()
 
+    def _toggle_float_view(self) -> None:
+        self.session.show_float_view = not self.session.show_float_view
+        self._after_setting_change()
+
     def _after_setting_change(self) -> None:
         self._refresh_status()
         self._reformat_history()
@@ -669,6 +680,7 @@ class MainWindow(QMainWindow):
             "sign": "signed" if session.signed else "unsigned",
             "base": session.int_base.upper(),
             "notation": session.notation.replace("eng_si", "eng·si").upper(),
+            "float": "FLOAT ON" if session.show_float_view else "FLOAT OFF",
         }
         tips = {
             "angle": "angle unit — click or Alt+D",
@@ -676,6 +688,7 @@ class MainWindow(QMainWindow):
             "sign": "signedness of >> and SGN row — click or Alt+S",
             "base": "integer result base for history & preview — click or Alt+B",
             "notation": "result notation — click or Alt+N",
+            "float": "show IEEE-754 breakdown for real results — click or Alt+F",
         }
         for key, label in self.status_items.items():
             label.setText(texts[key])

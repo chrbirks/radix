@@ -9,6 +9,14 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Added
+
+- Alt+F (or a new "FLOAT ON/OFF" status-bar chip) toggles the IEEE-754
+  breakdown that READOUT/REGISTER show for real-number results at word size
+  32/64. Off by default — the panel greys instead, as it already did at
+  word sizes 8/16 — since the float view is rarely needed and previously
+  appeared on nearly every non-integer result. Persisted across restarts.
+
 ## [5] - 2026-07-13
 
 ### Added

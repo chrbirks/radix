@@ -29,6 +29,7 @@ def load_session(session: Session) -> None:
         angle_deg = s.value("angle_deg", session.angle_deg, type=bool)
         notation = s.value("notation", session.notation, type=str)
         int_base = s.value("int_base", session.int_base, type=str)
+        show_float_view = s.value("show_float_view", session.show_float_view, type=bool)
     except (TypeError, ValueError):
         return  # unreadable file → defaults
     if word_size in WORD_SIZES:
@@ -39,6 +40,7 @@ def load_session(session: Session) -> None:
         session.notation = notation
     if int_base in INT_BASES:
         session.int_base = int_base
+    session.show_float_view = bool(show_float_view)
 
 
 def save_session(session: Session) -> None:
@@ -48,3 +50,4 @@ def save_session(session: Session) -> None:
     s.setValue("angle_deg", session.angle_deg)
     s.setValue("notation", session.notation)
     s.setValue("int_base", session.int_base)
+    s.setValue("show_float_view", session.show_float_view)
