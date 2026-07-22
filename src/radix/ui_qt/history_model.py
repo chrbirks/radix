@@ -42,9 +42,8 @@ SELECT_BAR_W = 2
 def split_assignment(result: str, prefix: str) -> tuple[str, str]:
     """("x", "12") for an assignment entry's (result, prefix), else ("", result).
 
-    Never returns the literal "x ← " arrow text — QFontMetrics.horizontalAdvance
-    segfaults under QT_QPA_PLATFORM=offscreen for glyphs needing font fallback,
-    so every renderer splits around the arrow instead of measuring/painting it.
+    Used by the history delegate to paint the variable name as a separate
+    badge chip instead of inlining the "x ← " prefix text.
     """
     if not prefix:
         return "", result

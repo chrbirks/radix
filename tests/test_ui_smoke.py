@@ -101,7 +101,7 @@ def test_result_readout_tracks_last_evaluated_result(qtbot, window: MainWindow) 
     assert window.result_label.text() == "1020"
     assert window.result_label.property("dimmed") == "false"
     _submit(qtbot, window, "x = 5")
-    assert window.result_label.text() == "x = 5"
+    assert window.result_label.text() == "x ← 5"
 
 
 def test_result_readout_reformats_on_base_change(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -127,7 +127,7 @@ def test_result_readout_seeded_from_persisted_history(qtbot, tmp_path) -> None: 
 
     win2 = MainWindow(Session(), LIGHT, store=store)
     qtbot.addWidget(win2)
-    assert win2.result_label.text() == "x = 255"
+    assert win2.result_label.text() == "x ← 255"
     assert win2.result_label.property("dimmed") == "false"
 
 

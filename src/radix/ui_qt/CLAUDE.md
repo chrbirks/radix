@@ -2,17 +2,20 @@
 
 - QSS px fonts leave `QFont.pointSize()` at −1 — scale via
   `history_model._scaled`, never `setPointSizeF` directly.
-- `QFontMetrics` (not just `.horizontalAdvance`) segfaults under
-  `QT_QPA_PLATFORM=offscreen` for glyphs needing font fallback (e.g. `→`
-  U+2192, `←` U+2190) — keep strings that get measured *or painted* (function
-  summaries, plain-text labels) to ASCII plus glyphs the bundled font has.
-  `HistoryEntry.prefix`/`.result` store the literal `"x ← 12"` form for
-  assignments, but nothing may render that string as-is — use
-  `history_model.split_assignment(result, prefix) -> (name, value)` to get
-  the pieces around the arrow (the history delegate paints `name` as a
-  separate badge chip; the RESULT readout joins them with `=`). Also
-  construct `QFontMetrics(font)` yourself; `widget.fontMetrics()` can dangle
-  in PySide6.
+- `QFontMetrics` (not just `.horizontalAdvance`) used to segfault under
+  `QT_QPA_PLATFORM=offscreen` for glyphs needing font fallback (`→`/`←` in
+  help summaries and the RESULT readout, `☀`/`☾`/`◐` in the theme-mode icon),
+  worked around by substituting ASCII/vector-drawn stand-ins. Verified
+  2026-07-22 this no longer reproduces with the installed fontconfig
+  (2.18.2-1) and this project's Qt/PySide6 (forced real font-fallback in a
+  standalone repro and ran the full offscreen suite), so the arrows and the
+  light/auto theme-mode glyphs render as actual Unicode again. Dark mode's
+  icon stays hand-drawn (`theme.theme_mode_icon`, a circle minus an offset
+  circle) — unrelated to the segfault, "☾" just renders far thinner than
+  the sun/half-circle glyphs at 16px. If the segfault resurfaces on a
+  different Qt/fontconfig pairing: keep measured/painted strings to glyphs
+  the bundled fonts cover, and construct `QFontMetrics(font)` yourself —
+  `widget.fontMetrics()` can dangle in PySide6 regardless of this bug.
 - On Wayland (GNOME Shell), `QApplication.setWindowIcon()` alone is not
   enough — the compositor looks up the icon via the window's desktop-file id
   matched against an *installed* `.desktop` file, ignoring in-process

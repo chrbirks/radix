@@ -39,12 +39,7 @@ from radix.history.store import HistoryStore, StoredEntry
 from radix.session import Session
 from radix.ui_qt.completer import Completer
 from radix.ui_qt.highlight import ExprHighlighter
-from radix.ui_qt.history_model import (
-    HistoryDelegate,
-    HistoryEntry,
-    HistoryModel,
-    split_assignment,
-)
+from radix.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
 from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
 from radix.ui_qt.settings import app_settings, load_session, save_session
@@ -344,11 +339,7 @@ class MainWindow(QMainWindow):
         prefix = f"{outcome.target} ← " if outcome.kind == "assign" else ""
         display = prefix + primary
         self.last_result_text = primary
-        # ASCII "=" rather than the stored "x ← " prefix: QFontMetrics
-        # segfaults under QT_QPA_PLATFORM=offscreen measuring the arrow glyph
-        # (see split_assignment), and this is a plain QLabel, not custom-painted.
-        result_readout = f"{outcome.target} = {primary}" if outcome.kind == "assign" else primary
-        self.result_label.setText(result_readout)
+        self.result_label.setText(display)
         self.result_label.setProperty("dimmed", "false")
         style = self.result_label.style()
         style.unpolish(self.result_label)
@@ -683,8 +674,7 @@ class MainWindow(QMainWindow):
         if not self.model.entries:
             return
         last = self.model.entries[-1]
-        name, value_text = split_assignment(last.result, last.prefix)
-        self.result_label.setText(f"{name} = {value_text}" if name else value_text)
+        self.result_label.setText(last.result)
         self.result_label.setProperty("dimmed", "false")
 
     def _refresh_status(self) -> None:

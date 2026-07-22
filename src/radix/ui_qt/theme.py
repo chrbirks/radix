@@ -15,12 +15,11 @@ Plex Sans Condensed SemiBold, uppercase micro-labels only).
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from importlib import resources
 
-from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFontDatabase, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtCore import QPointF, Qt
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import QApplication
 
 THEME_MODES = ("auto", "light", "dark")
@@ -156,32 +155,24 @@ def load_app_icon() -> QIcon:
     return QIcon(pixmap)
 
 
+_MODE_GLYPHS = {"light": "☀", "auto": "◐"}
+
+
 def theme_mode_icon(mode: str, color: str, size: int = 16) -> QIcon:
     """Sun / moon / half-and-half glyph for the theme-mode status chip.
 
-    Drawn with QPainter primitives rather than a Unicode sun/moon character:
-    QFontMetrics segfaults under QT_QPA_PLATFORM=offscreen measuring glyphs
-    the bundled fonts don't cover (see CLAUDE.md), and neither bundled face
-    is guaranteed to ship "☀"/"☾".
+    Light/auto draw the Unicode glyph directly, but "☾" renders far thinner
+    than the other two at 16px, so dark mode keeps a hand-drawn crescent (a
+    circle minus an offset circle) for matching visual weight.
     """
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     ink = QColor(color)
-    cx, cy = size / 2, size / 2
-    r = size * 0.28
-    if mode == "light":
-        painter.setBrush(ink)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QPointF(cx, cy), r, r)
-        painter.setPen(QPen(ink, 1.4))
-        for i in range(8):
-            angle = (math.pi / 4) * i
-            x1, y1 = cx + (r + 2) * math.cos(angle), cy + (r + 2) * math.sin(angle)
-            x2, y2 = cx + (r + 5) * math.cos(angle), cy + (r + 5) * math.sin(angle)
-            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
-    elif mode == "dark":
+    if mode == "dark":
+        cx, cy = size / 2, size / 2
+        r = size * 0.28
         disc = QPainterPath()
         disc.addEllipse(QPointF(cx, cy), r, r)
         bite = QPainterPath()
@@ -189,14 +180,12 @@ def theme_mode_icon(mode: str, color: str, size: int = 16) -> QIcon:
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(ink)
         painter.drawPath(disc.subtracted(bite))
-    else:  # auto: half-filled disc, split down the middle
-        rect = QRectF(cx - r, cy - r, 2 * r, 2 * r)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(ink)
-        painter.drawPie(rect, 90 * 16, 180 * 16)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(ink, 1.4))
-        painter.drawEllipse(rect)
+    else:
+        font = QFont()
+        font.setPixelSize(round(size * 0.85))
+        painter.setFont(font)
+        painter.setPen(ink)
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, _MODE_GLYPHS[mode])
     painter.end()
     return QIcon(pixmap)
 
