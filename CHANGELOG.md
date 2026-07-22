@@ -9,6 +9,11 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+### Changed
+
+- The data-trace green (asserted bits, syntax-highlighted numbers, IEEE-754
+  exponent band) is now blue (`#0078FF`) in both themes.
+
 ### Added
 
 - Alt+F (or a new "FLOAT ON/OFF" status-bar chip) toggles the IEEE-754
