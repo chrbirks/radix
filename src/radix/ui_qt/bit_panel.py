@@ -297,7 +297,7 @@ class IntegerView(QWidget):
 
         actions = QHBoxLayout()
         actions.setContentsMargins(12, 0, 12, 8)
-        pin_btn = QPushButton("pin")
+        pin_btn = QPushButton("pin result")
         pin_btn.setProperty("class", "copyBtn")
         pin_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         pin_btn.clicked.connect(self._emit_pin_requested)
