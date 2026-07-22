@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from radix.engine import evaluator, render
 from radix.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
 from radix.engine import help as help_mod
-from radix.engine.errors import CalcError, EvalError, Span
+from radix.engine.errors import CalcError, EvalError, Span, shift
 from radix.engine.formatter import (
     FloatViews,
     IntegerViews,
@@ -23,6 +23,8 @@ from radix.engine.formatter import (
     integer_views,
 )
 from radix.engine.functions import CONSTANTS, FUNCTIONS, EvalContext
+from radix.engine.layouts import RegLayout, flatten_spec, layout_from_nodes
+from radix.engine.lexer import tokenize
 from radix.engine.nodes import Assign
 from radix.engine.parser import parse
 from radix.engine.values import Value
@@ -32,7 +34,7 @@ NOTATIONS = ("auto", "sci", "eng", "eng_si")
 INT_BASES = ("dec", "hex", "bin")
 
 RESERVED_NAMES = (
-    frozenset({"ans", "help", "clear", "vars", "del"})
+    frozenset({"ans", "help", "clear", "vars", "del", "layout"})
     | frozenset(CONSTANTS)
     | frozenset(FUNCTIONS)
 )
@@ -42,7 +44,7 @@ RESERVED_NAMES = (
 class Outcome:
     """Result of evaluating one input line."""
 
-    kind: str  # "value" | "assign" | "help" | "clear" | "empty"
+    kind: str  # "value" | "assign" | "help" | "clear" | "vars" | "del" | "layout" | "empty"
     value: Value | None = None
     target: str | None = None  # assignment target
     normalized: str = ""  # resolved pretty-print of the parse, for the preview
@@ -64,6 +66,7 @@ class Session:
     int_base: str = "dec"  # display base for integer results (dec/hex/bin)
     show_float_view: bool = False  # IEEE-754 breakdown in READOUT/REGISTER
     variables: dict[str, Value] = field(default_factory=dict)
+    layouts: dict[str, RegLayout] = field(default_factory=dict)
     ans: Value | None = None
 
     # -- settings ------------------------------------------------------------
@@ -104,13 +107,21 @@ class Session:
                 raise EvalError(
                     f"{node.target!r} is reserved and cannot be assigned", node.target_span
                 )
-            value = evaluator.evaluate(node.expr, self.context, self.variables, self.ans)
+            if node.target in self.layouts:
+                raise EvalError(
+                    f"{node.target!r} is already a layout — del it first", node.target_span
+                )
+            value = evaluator.evaluate(
+                node.expr, self.context, self.variables, self.ans, layouts=self.layouts
+            )
             value = evaluator.guard_finite(value, node.expr.span)
             if commit:
                 self.variables[node.target] = value
                 self.ans = value
             return Outcome("assign", value, node.target, normalized=preview)
-        value = evaluator.evaluate(node, self.context, self.variables, self.ans)
+        value = evaluator.evaluate(
+            node, self.context, self.variables, self.ans, layouts=self.layouts
+        )
         value = evaluator.guard_finite(value, node.span)
         if commit:
             self.ans = value
@@ -133,22 +144,81 @@ class Session:
         if word == "clear" and not rest:
             if commit:
                 self.variables.clear()
+                self.layouts.clear()
                 self.ans = None
             return Outcome("clear")
         if word == "vars" and not rest:
             lines = [f"{k} = {self.format_value(v)}" for k, v in self.variables.items()]
+            lines += [f"{name} = layout {lyt.spec_text()}" for name, lyt in self.layouts.items()]
             return Outcome("vars", help_text="\n".join(lines) or "no variables defined")
         if word == "del":
             if rest.startswith("="):
                 return None  # `del = ...` is an assignment attempt → reserved-name error
             if not rest:
                 raise EvalError("del: which variable? e.g. del x", Span(0, len(line)))
-            if rest not in self.variables:
-                raise EvalError(f"no variable named {rest!r}", Span(len(word) + 1, len(line)))
-            if commit:
-                del self.variables[rest]
-            return Outcome("del", target=rest)
+            if rest in self.variables:
+                if commit:
+                    del self.variables[rest]
+                return Outcome("del", target=rest)
+            if rest in self.layouts:
+                if commit:
+                    del self.layouts[rest]
+                return Outcome("del", target=rest)
+            raise EvalError(
+                f"no variable or layout named {rest!r}", Span(len(word) + 1, len(line))
+            )
+        if word == "layout":
+            if rest.startswith("="):
+                return None  # `layout = ...` is an assignment attempt → reserved-name error
+            if not rest:
+                lines = [
+                    f"{name} = layout {lyt.spec_text()}" for name, lyt in self.layouts.items()
+                ]
+                return Outcome("layout", help_text="\n".join(lines) or "no layouts defined")
+            return self._layout_command(line, word, rest, commit)
         return None
+
+    def _layout_command(self, line: str, word: str, rest: str, commit: bool) -> Outcome:
+        usage_error = EvalError(
+            "layout: expected 'NAME = FIELD[msb:lsb] ...', e.g. layout CTRL = EN[31]",
+            Span(len(word) + 1, len(line)),
+        )
+        if "=" not in rest:
+            raise usage_error
+        name_raw, _, spec_raw = rest.partition("=")
+        name = name_raw.strip()
+        if not name:
+            raise usage_error
+        name_start = line.index(name_raw, len(word) + 1)
+        name_span = Span(name_start, name_start + len(name))
+        toks = tokenize(name)
+        if not (len(toks) == 2 and toks[0].kind == "IDENT" and toks[1].kind == "EOF"):
+            raise EvalError(f"{name!r} is not a valid layout name", name_span)
+        if name in RESERVED_NAMES:
+            raise EvalError(f"{name!r} is reserved and cannot be assigned", name_span)
+        if name in self.variables:
+            raise EvalError(f"{name!r} is already a variable — del it first", name_span)
+        spec_text = spec_raw.strip()
+        if not spec_text:
+            raise EvalError(
+                "layout: expected at least one field, e.g. layout CTRL = EN[31]",
+                Span(len(line), len(line)),
+            )
+        eq_index = name_start + len(name_raw)
+        spec_offset = eq_index + 1
+        while spec_offset < len(line) and line[spec_offset].isspace():
+            spec_offset += 1
+        try:
+            node = parse(spec_text)
+            leaves = flatten_spec(node)
+            new_layout = layout_from_nodes(leaves, name=name)
+        except CalcError as exc:
+            raise type(exc)(exc.message, shift(exc.span, spec_offset)) from exc
+        if commit:
+            self.layouts[name] = new_layout
+        return Outcome(
+            "layout", target=name, help_text=f"layout {name} = {new_layout.spec_text()}"
+        )
 
     # -- display helpers -------------------------------------------------------
 

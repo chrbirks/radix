@@ -30,6 +30,18 @@ _OPERATOR_HELP: list[tuple[str, str, str]] = [
     ("[]", "Bit slice/test: x[7:4] extracts bits, x[3] tests one.", "0xAB[7:4] = 0xA"),
 ]
 
+_COMMAND_HELP: dict[str, str] = {
+    "layout": (
+        "layout NAME = FIELD[msb:lsb] ... — define a register field layout\n"
+        "  layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]   define\n"
+        "  layout                                                list all layouts\n"
+        "  del CTRL                                              delete a layout\n"
+        "  CTRL(0x8C01A0F3)                                      decode a value\n"
+        "  ans.ADDR                                              read a field as an int\n"
+        "  fields(x, EN[7] CMD[3:0])                             one-shot decode, no name"
+    ),
+}
+
 _BASICS = f"""\
 Radix v{__version__}
 
@@ -47,6 +59,7 @@ Integers   Results that are integers also show hex/dec/bin and the bit panel.
            Word size and signedness affect bit operators and that display only.
 Commands   help        this overview            help <name>   one operator/function
            clear       wipe variables & history
+           layout NAME = FIELD[msb:lsb] ...   define a register field layout
 """
 
 
@@ -119,4 +132,6 @@ def topic_help(topic: str) -> str | None:
     for op, summary, example in _OPERATOR_HELP:
         if topic == op:
             return f"{op} — {summary}\nExample: {example}"
+    if topic in _COMMAND_HELP:
+        return _COMMAND_HELP[topic]
     return None

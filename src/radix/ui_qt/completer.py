@@ -40,6 +40,7 @@ _COMMANDS = (
     ("clear", "Wipe variables and history."),
     ("vars", "List defined variables (Alt+V pane)."),
     ("del", "del <name>: remove one variable."),
+    ("layout", "Define/list register field layouts."),
 )
 
 
@@ -63,6 +64,10 @@ def completions(session: Session) -> list[Completion]:
         items.append(Completion("ans", "ans", "ans", "The previous result.", "constant"))
     for name in session.variables:
         items.append(Completion(name, name, name, "Session variable.", "ident"))
+    for name, layout in session.layouts.items():
+        items.append(
+            Completion(name, f"{name}(", name, f"layout: {layout.spec_text()}", "layout")
+        )
     for name, summary in _COMMANDS:
         items.append(Completion(name, name, name, summary, "paren"))
     return items

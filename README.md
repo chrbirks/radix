@@ -74,6 +74,10 @@ directory (no logout needed).
 > x = 8'hA5                Verilog/VHDL literals: 8'hFF, 12'b1010_1010, x"FF"
 > x[7:4]                   bit slicing and testing: x[3]
   10
+> layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]
+                           name a register field layout; CTRL(v) decodes v
+> CTRL(0x8C01_A0F3)        REGISTER grid shows the named field bands live
+  0x8C01A0F3   EN=1 IRQ=0b000 ADDR=0xC01A0 CMD=0xF3
 > 2**10 + 0b1010           ** = power, ^ = XOR — in every context
 > sin(pi/4)                sin cos tan … log ln log2 sqrt exp abs floor ceil round
 > clog2(300)               FPGA toolkit: clog2 flog2 mask bit popcount parity

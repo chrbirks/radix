@@ -140,6 +140,7 @@ _TRIG = "Trigonometry"
 _HYP = "Hyperbolic"
 _LOG = "Logarithms & exponentials"
 _ROUND = "Roots & rounding"
+_REG = "Register fields"
 
 _trig_note = "uses the current deg/rad setting"
 _inv_note = "result in the current angle unit"
@@ -175,6 +176,17 @@ _register("abs", (1, 1), "x", _ROUND, "Absolute value.", "abs(-4)", _abs)
 _register("floor", (1, 1), "x", _ROUND, "Round down to an integer.", "floor(2.7)", _floor)
 _register("ceil", (1, 1), "x", _ROUND, "Round up to an integer.", "ceil(2.1)", _ceil)
 _register("round", (1, 1), "x", _ROUND, "Round to the nearest integer.", "round(2.5)", _round)
+
+
+def _fields_stub(args: list[Number], ctx: EvalContext) -> Number:
+    raise AssertionError("fields() is macro-dispatched in the evaluator")  # pragma: no cover
+
+
+_register(
+    "fields", (2, 2), "value, NAME[msb:lsb] ...", _REG,
+    "Decode value into named bit-fields; draws them on the REGISTER grid.",
+    "fields(0xF3, MODE[7:4] CMD[3:0])", _fields_stub,
+)
 
 CONSTANTS: dict[str, tuple[Number, str]] = {
     "pi": (mpmath.mpf(0), "The circle constant π."),  # filled in below after dps set

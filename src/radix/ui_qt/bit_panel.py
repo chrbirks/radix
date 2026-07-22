@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen, QResizeEvent
+from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen, QResizeEvent
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from radix.engine.formatter import FloatViews, format_int_base, integer_views
+from radix.engine.layouts import RegLayout, format_field_value
 from radix.ui_qt.theme import FONT_MICRO, Palette
 from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
@@ -30,6 +31,7 @@ GAP = 4
 NIBBLE_GAP = 10
 HEX_H = 20  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
+FIELD_H = 16  # field-band strip above the hex strip, present only with a layout
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
 LANE_ROWS = 4  # max simultaneous lanes (HEX/DEC/BIN/ASC, or HEX/SGN/EXP/MAN)
@@ -59,6 +61,9 @@ class BitGrid(QWidget):
         # (exp_width, man_width) when showing an IEEE-754 pattern: cells get
         # sign/exponent/mantissa band colors and become read-only.
         self.float_fields: tuple[int, int] | None = None
+        # (name, msb, lsb) tuples, msb-descending, when a register field
+        # layout is showing. Unlike float mode, cells stay clickable/editable.
+        self.named_fields: tuple[tuple[str, int, int], ...] | None = None
         self._hover_bit: int | None = None
         self._press_bit: int | None = None
         self._dragging = False
@@ -72,12 +77,14 @@ class BitGrid(QWidget):
         enabled: bool,
         changed: int = 0,
         float_fields: tuple[int, int] | None = None,
+        named_fields: tuple[tuple[str, int, int], ...] | None = None,
     ) -> None:
         self.value = value
         self.word_size = word_size
         self.enabled_look = enabled
         self.changed = changed
         self.float_fields = float_fields
+        self.named_fields = named_fields
         self._apply_height()
         self.update()
 
@@ -88,6 +95,19 @@ class BitGrid(QWidget):
         if bit == self.word_size - 1:
             return "sign"
         return "exponent" if bit >= man_width else "mantissa"
+
+    def _field_index_of(self, bit: int) -> int | None:
+        """Index into `self.named_fields` of the field containing `bit`, if any.
+
+        A field clipped by the current word size (`msb >= word_size`) never
+        tints cells, consistent with its bracket not being drawn either.
+        """
+        if self.named_fields is None:
+            return None
+        for i, (_name, msb, lsb) in enumerate(self.named_fields):
+            if msb < self.word_size and lsb <= bit <= msb:
+                return i
+        return None
 
     def set_palette(self, palette: Palette) -> None:
         self.palette_tokens = palette
@@ -102,8 +122,11 @@ class BitGrid(QWidget):
         per_row = self._bits_per_row()
         return (self.word_size + per_row - 1) // per_row
 
+    def _row_h(self) -> int:
+        return ROW_H + (FIELD_H if self.named_fields else 0)
+
     def _apply_height(self) -> None:
-        self.setMinimumHeight(self._rows() * ROW_H + TOP_MARGIN + BOTTOM_MARGIN)
+        self.setMinimumHeight(self._rows() * self._row_h() + TOP_MARGIN + BOTTOM_MARGIN)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         self._apply_height()
@@ -116,11 +139,12 @@ class BitGrid(QWidget):
         row, col = divmod(pos, per_row)
         nibble_gaps = col // 4
         x = 4 + col * (CELL + GAP) + nibble_gaps * NIBBLE_GAP
-        y = TOP_MARGIN + row * ROW_H + HEX_H
+        field_offset = FIELD_H if self.named_fields else 0
+        y = TOP_MARGIN + row * self._row_h() + field_offset + HEX_H
         return QRectF(x, y, CELL, CELL)
 
     def sizeHint(self) -> QSize:
-        return QSize(2 * BYTE_WIDTH, self._rows() * ROW_H + TOP_MARGIN + BOTTOM_MARGIN)
+        return QSize(2 * BYTE_WIDTH, self._rows() * self._row_h() + TOP_MARGIN + BOTTOM_MARGIN)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -138,6 +162,15 @@ class BitGrid(QWidget):
                 if not set_:
                     color.setAlphaF(0.22)
                 brush = color
+            elif self.named_fields is not None and self.enabled_look:
+                idx = self._field_index_of(bit)
+                if idx is not None:
+                    color = QColor(p.field_bands[idx % len(p.field_bands)])
+                    if not set_:
+                        color.setAlphaF(0.22)
+                    brush = color
+                else:
+                    brush = on if set_ else off
             else:
                 brush = on if set_ else off
             painter.setPen(Qt.PenStyle.NoPen)
@@ -153,6 +186,8 @@ class BitGrid(QWidget):
             painter.setPen(QPen(QColor(p.text), 1.5))
             for bit in range(lo, min(hi, self.word_size - 1) + 1):
                 painter.drawRoundedRect(self._cell_rect(bit).adjusted(-1, -1, 1, 1), 3, 3)
+        if self.named_fields is not None:
+            self._paint_field_bands(painter)
         label_font = painter.font()
         label_font.setPixelSize(16)
         painter.setFont(label_font)
@@ -186,6 +221,55 @@ class BitGrid(QWidget):
                 label_rect = QRectF(cell.left() - GAP, cell.bottom() + 1, CELL + 2 * GAP, INDEX_H)
                 painter.drawText(label_rect, Qt.AlignmentFlag.AlignHCenter, str(bit))
         painter.end()
+
+    def _paint_field_bands(self, painter: QPainter) -> None:
+        """Bracket + name over each row a field spans (dimension-line style).
+
+        A field wrapping across rows draws its name once, on the row holding
+        its MSB-most segment; other rows get only the bracket.
+        """
+        assert self.named_fields is not None
+        p = self.palette_tokens
+        per_row = self._bits_per_row()
+        rows = self._rows()
+        micro_font = QFont(painter.font())
+        micro_font.setPixelSize(FONT_MICRO)
+        for field_index, (name, msb, lsb) in enumerate(self.named_fields):
+            if msb >= self.word_size:
+                continue  # clipped by the current word size: not drawn
+            color = QColor(p.field_bands[field_index % len(p.field_bands)])
+            pos_start = self.word_size - 1 - msb
+            pos_end = self.word_size - 1 - lsb
+            for row in range(rows):
+                row_start = row * per_row
+                row_end = row_start + per_row - 1
+                seg_start = max(pos_start, row_start)
+                seg_end = min(pos_end, row_end)
+                if seg_start > seg_end:
+                    continue
+                bit_left = self.word_size - 1 - seg_start
+                bit_right = self.word_size - 1 - seg_end
+                left_rect = self._cell_rect(bit_left)
+                right_rect = self._cell_rect(bit_right)
+                y_top = TOP_MARGIN + row * self._row_h()
+                y_line = y_top + FIELD_H - 4
+                x_left, x_right = left_rect.left(), right_rect.right()
+                painter.setPen(QPen(color, 1.5))
+                painter.drawLine(QPointF(x_left, y_line), QPointF(x_right, y_line))
+                painter.drawLine(QPointF(x_left, y_line), QPointF(x_left, y_line + 3))
+                painter.drawLine(QPointF(x_right, y_line), QPointF(x_right, y_line + 3))
+                if seg_start == pos_start:
+                    painter.setFont(micro_font)
+                    painter.setPen(color)
+                    label_rect = QRectF(x_left, y_top, x_right - x_left, y_line - y_top)
+                    text = painter.fontMetrics().elidedText(
+                        name, Qt.TextElideMode.ElideRight, int(label_rect.width())
+                    )
+                    painter.drawText(
+                        label_rect,
+                        Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+                        text,
+                    )
 
     def _bit_at(self, pos: QPointF) -> int | None:
         for bit in range(self.word_size):
@@ -229,6 +313,9 @@ class BitGrid(QWidget):
         state = (self.value >> bit) & 1
         if self.float_fields is not None:
             self.setToolTip(f"bit {bit} = {state}    {self._field_of(bit)}")
+        elif self.named_fields is not None and (idx := self._field_index_of(bit)) is not None:
+            name, msb, lsb = self.named_fields[idx]
+            self.setToolTip(f"bit {bit} = {state}    {name}[{msb}:{lsb}]")
         else:
             self.setToolTip(
                 f"bit {bit} = {state}    2^{bit} = {1 << bit}    byte {bit // 8}, nibble {bit // 4}"
@@ -261,6 +348,10 @@ class IntegerView(QWidget):
         self.active = False
         self._ref: tuple[str, int] | None = None  # armed channel: (label, value)
         self.float_mode: FloatViews | None = None  # read-only IEEE-754 display
+        # Field layout for the shown value. Named `reg_layout`, not `layout`
+        # (QWidget already defines a `layout()` method returning the widget's
+        # own QLayout -- an instance attribute named `layout` would shadow it).
+        self.reg_layout: RegLayout | None = None
 
         self.rows: dict[str, tuple[QLabel, QLabel]] = {}
         self._copy_texts: dict[str, str] = {}
@@ -295,6 +386,13 @@ class IntegerView(QWidget):
         self.grid_widget.bit_toggled.connect(self.toggle_bit)
         self.grid_widget.selection_changed.connect(self._update_slice_label)
 
+        self.field_table = QLabel("")
+        self.field_table.setObjectName("fieldTable")
+        self.field_table.setTextFormat(Qt.TextFormat.RichText)
+        self.field_table.setWordWrap(True)  # long layouts must wrap, never clip at the edge
+        self.field_table.linkActivated.connect(self._on_field_link)
+        self.field_table.setVisible(False)
+
         actions = QHBoxLayout()
         actions.setContentsMargins(12, 0, 12, 8)
         pin_btn = QPushButton("pin result")
@@ -319,6 +417,7 @@ class IntegerView(QWidget):
         layout.addLayout(grid)
         layout.addWidget(margin_wrap(self.register_caption, 12))
         layout.addWidget(self.grid_widget)
+        layout.addWidget(margin_wrap(self.field_table, 12))
         layout.addLayout(actions)
 
     # -- state ---------------------------------------------------------------
@@ -329,6 +428,7 @@ class IntegerView(QWidget):
         word_size: int,
         signed: bool,
         float_views: FloatViews | None = None,
+        layout: RegLayout | None = None,
     ) -> None:
         # scratch is kept unmasked: cycling the word size must only change how
         # the value is *displayed*, never destroy its upper bits.
@@ -339,6 +439,7 @@ class IntegerView(QWidget):
         self.word_size = word_size
         self.signed = signed
         self.float_mode = float_views if value is None else None
+        self.reg_layout = layout
         was_active = self.active
         self.active = value is not None
         if value is not None:
@@ -454,7 +555,50 @@ class IntegerView(QWidget):
             self.delta_label.setText(f"Δ +{gained} -{lost}")
         else:
             self.delta_label.setText("")
-        self.grid_widget.set_state(self._masked_scratch, self.word_size, self.active, changed)
+        named_fields = (
+            tuple((f.name, f.msb, f.lsb) for f in self.reg_layout.fields)
+            if self.reg_layout
+            else None
+        )
+        self.grid_widget.set_state(
+            self._masked_scratch, self.word_size, self.active, changed, named_fields=named_fields
+        )
+        self._update_slice_label()
+        self._refresh_field_table()
+
+    def _refresh_field_table(self) -> None:
+        if self.reg_layout is None or not self.active:
+            self.field_table.setVisible(False)
+            return
+        self.field_table.setVisible(True)
+        field_bands = self.palette_tokens.field_bands
+        parts = []
+        for field_index, f in enumerate(self.reg_layout.fields):
+            bracket = f"[{f.msb}]" if f.msb == f.lsb else f"[{f.msb}:{f.lsb}]"
+            if f.msb >= self.word_size:
+                parts.append(
+                    f'<span style="color:{self.palette_tokens.muted}">'
+                    f"{f.name} {bracket} = -</span>"
+                )
+                continue
+            value = (self._masked_scratch >> f.lsb) & ((1 << f.width) - 1)
+            text = format_field_value(f, value)
+            # Name colored to match its grid bracket, so the table and the
+            # overlay above read as one mapping, not two separate legends.
+            color = field_bands[field_index % len(field_bands)]
+            parts.append(
+                f'<a href="{f.name}" style="color:{color}; text-decoration:none;">{f.name}</a>'
+                f" {bracket} = {text}"
+            )
+        self.field_table.setText("&nbsp;&nbsp;&nbsp;".join(parts))
+
+    def _on_field_link(self, name: str) -> None:
+        if self.reg_layout is None:
+            return
+        f = self.reg_layout.field(name)
+        if f is None:
+            return
+        self.grid_widget.set_selection((f.msb, f.lsb))
         self._update_slice_label()
 
     def _refresh_float(self, views: FloatViews) -> None:

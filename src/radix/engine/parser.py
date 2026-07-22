@@ -28,6 +28,7 @@ from radix.engine.nodes import (
     Assign,
     Binary,
     Call,
+    Field,
     Literal,
     Name,
     Node,
@@ -124,6 +125,16 @@ class Parser:
                 if min_bp > SLICE_BP:
                     return left
                 left = self._slice(left)
+            elif tok.kind == "OP" and tok.text == ".":
+                if min_bp > SLICE_BP:
+                    return left
+                self._advance()
+                if self.cur.kind != "IDENT":
+                    raise self._error("expected a field name after '.'", self.cur.span)
+                name_tok = self._advance()
+                left = Field(
+                    Span(left.span.start, name_tok.span.end), left, name_tok.text, name_tok.span
+                )
             elif self._starts_operand(tok):
                 # Implicit multiplication: two adjacent operands.
                 if min_bp > IMPLICIT_MUL_BP:

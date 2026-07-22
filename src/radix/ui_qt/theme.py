@@ -46,6 +46,7 @@ class Palette:
     float_sign: str  # IEEE-754 / Qm.n field bands in the bit grid
     float_exp: str
     float_man: str
+    field_bands: tuple[str, ...]  # register field overlay, cycled by field index
     syn_number: str
     syn_function: str
     syn_operator: str
@@ -72,6 +73,7 @@ LIGHT = Palette(
     float_sign="#B87D0F",
     float_exp="#0078FF",
     float_man="#7C5CBF",
+    field_bands=("#0078FF", "#8B5CF6", "#0D9488", "#EA8C00", "#DB2777", "#64748B"),
     syn_number="#0078FF",
     syn_function="#7C5CBF",
     syn_operator="#B87D0F",
@@ -99,6 +101,7 @@ DARK = Palette(
     float_sign="#F39C12",
     float_exp="#0078FF",
     float_man="#BB86FC",
+    field_bands=("#0078FF", "#BB86FC", "#14B8A6", "#FB923C", "#F472B6", "#94A3B8"),
     syn_number="#0078FF",
     syn_function="#BB86FC",
     syn_operator="#F39C12",
@@ -301,6 +304,11 @@ def stylesheet(p: Palette, mono: str, label: str = LABEL_FAMILY) -> str:
         color: {p.bit_changed};
         font-size: {FONT_SMALL}px;
         padding: 1px 6px;
+    }}
+    QLabel#fieldTable {{
+        color: {p.text};
+        font-size: {FONT_SMALL}px;
+        padding: 2px 0px;
     }}
     QStatusBar {{
         background: {p.background};

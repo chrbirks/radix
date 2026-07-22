@@ -23,6 +23,12 @@ class Span:
         return " " * self.start + "^" * width
 
 
+def shift(span: Span, delta: int) -> Span:
+    """Translate a span by ``delta`` characters, e.g. re-anchoring a span computed
+    against a substring back into the full line it was extracted from."""
+    return Span(span.start + delta, span.end + delta)
+
+
 class CalcError(Exception):
     """Base class for all engine errors."""
 

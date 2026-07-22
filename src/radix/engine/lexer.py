@@ -50,7 +50,7 @@ BINARY_SUFFIXES: dict[str, int] = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30}
 
 # Longest first so ** << >> // match before their one-char prefixes.
 OPERATORS = ["**", "<<", ">>", "//", "|", "^", "&", "+", "-", "*", "/", "%",
-             "~", "(", ")", "[", "]", ":", ",", "="]
+             "~", "(", ")", "[", "]", ":", ",", "=", "."]
 
 _HDL_BASES = {"h": 16, "b": 2, "d": 10, "o": 8}
 

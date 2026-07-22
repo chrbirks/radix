@@ -1260,3 +1260,157 @@ def test_int_base_and_float_view_shortcuts_use_alt_shift(qtbot, window: MainWind
     assert "Alt+Shift+F" in shortcuts
     assert "Alt+B" not in shortcuts
     assert "Alt+F" not in shortcuts
+
+
+def _define_ctrl_layout(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]")
+
+
+def test_register_layout_shows_grid_overlay_matching_fields(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    from radix.ui_qt.bit_panel import FIELD_H
+
+    grid = window.intview.grid_widget
+    no_layout_rows = grid._rows()
+    no_layout_min_h = grid.minimumHeight()
+
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+
+    assert grid.named_fields == (
+        ("EN", 31, 31),
+        ("IRQ", 30, 28),
+        ("ADDR", 27, 8),
+        ("CMD", 7, 0),
+    )
+    rows = grid._rows()
+    assert rows == no_layout_rows  # same word size -> same row count
+    assert grid.minimumHeight() == no_layout_min_h + rows * FIELD_H
+
+
+def test_register_layout_field_table_visible_with_values(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+
+    assert window.intview.field_table.isVisibleTo(window)
+    text = window.intview.field_table.text()
+    assert "EN" in text
+    assert "CMD" in text
+    assert "0xF3" in text  # CMD = 0xF3, matching decode_note's own formatting
+    assert "</a> [31] = 1" in text  # single-bit field: collapsed range, not [31:31]
+    assert "[31:31]" not in text
+
+
+def test_register_layout_field_table_updates_on_bit_toggle(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+    assert "0xF3" in window.intview.field_table.text()
+
+    window.intview.toggle_bit(0)  # inside CMD[7:0]: 0xF3 -> 0xF2
+    assert "0xF2" in window.intview.field_table.text()
+    assert "0xF3" not in window.intview.field_table.text()
+
+
+def test_register_layout_field_link_selects_range(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+
+    window.intview._on_field_link("CMD")
+    assert window.intview.grid_widget.selection == (7, 0)
+    assert window.intview.slice_label.text().startswith("[7:0]")
+
+
+def test_register_layout_survives_word_size_cycle(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+
+    window.session.cycle_word_size()  # 32 -> 64
+    window._after_setting_change()
+    assert window.intview.grid_widget.named_fields is not None  # overlay survives
+
+    window.session.cycle_word_size()  # 64 -> 8: clips the layout's top field (EN, bit 31)
+    window._after_setting_change()
+    assert window.intview.grid_widget.named_fields is not None  # overlay still not wiped
+    assert window.intview.grid_widget._field_index_of(7) == 3  # CMD (top byte) still active
+    assert "= -" in window.intview.field_table.text()  # EN reported as clipped
+
+
+def test_register_layout_cleared_by_plain_number(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+    assert window.intview.grid_widget.named_fields is not None
+
+    _submit(qtbot, window, "1 + 1")
+    assert window.intview.grid_widget.named_fields is None
+    assert not window.intview.field_table.isVisibleTo(window)
+
+
+def test_layout_command_toasts_and_refreshes_vars_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    assert "CTRL" in window.toast_label.text()
+    window._show_vars()
+    texts = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
+    assert any("CTRL" in t for t in texts)
+
+
+def test_bare_layout_command_shows_vars_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "layout")
+    assert window.vars_pane.isVisibleTo(window)
+
+
+def test_vars_pane_layout_row_click_inserts_call_paren(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    window._show_vars()
+    item = next(
+        window.vars_pane.item(i)
+        for i in range(window.vars_pane.count())
+        if "CTRL" in window.vars_pane.item(i).text()
+    )
+    window._insert_var_name(item)
+    assert window.input.text() == "CTRL("
+
+
+def test_register_layout_cells_stay_clickable_and_draggable(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    # Named-fields mode is explicitly NOT read-only, unlike float mode: a
+    # click still toggles bits and a drag still selects a range.
+    from PySide6.QtCore import QEvent
+    from PySide6.QtGui import QMouseEvent
+
+    _define_ctrl_layout(qtbot, window)
+    _submit(qtbot, window, "CTRL(0x8C01A0F3)")
+    grid = window.intview.grid_widget
+    grid.resize(600, 400)
+    assert grid.named_fields is not None
+
+    def mouse(kind: QEvent.Type, bit: int, buttons: Qt.MouseButton) -> QMouseEvent:
+        pos = grid._cell_rect(bit).center()
+        return QMouseEvent(
+            kind, pos, pos, pos,
+            Qt.MouseButton.LeftButton, buttons, Qt.KeyboardModifier.NoModifier,
+        )
+
+    grid.mousePressEvent(mouse(QEvent.Type.MouseButtonPress, 4, Qt.MouseButton.LeftButton))
+    grid.mouseMoveEvent(mouse(QEvent.Type.MouseMove, 1, Qt.MouseButton.LeftButton))
+    grid.mouseReleaseEvent(mouse(QEvent.Type.MouseButtonRelease, 1, Qt.MouseButton.NoButton))
+    assert grid.selection == (4, 1)  # drag-select still works
+
+    before = window.intview.scratch
+    grid.mousePressEvent(mouse(QEvent.Type.MouseButtonPress, 0, Qt.MouseButton.LeftButton))
+    grid.mouseReleaseEvent(mouse(QEvent.Type.MouseButtonRelease, 0, Qt.MouseButton.NoButton))
+    assert window.intview.scratch == before ^ 1  # plain click still toggles
+
+
+def test_vars_pane_layout_row_right_click_deletes(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_layout(qtbot, window)
+    assert "CTRL" in window.session.layouts
+    window._show_vars()
+    item = next(
+        window.vars_pane.item(i)
+        for i in range(window.vars_pane.count())
+        if "CTRL" in window.vars_pane.item(i).text()
+    )
+    name = item.data(Qt.ItemDataRole.UserRole)
+    assert name == "CTRL"
+    del window.session.layouts[name]
+    window._refresh_vars_pane()
+    assert "CTRL" not in window.session.layouts

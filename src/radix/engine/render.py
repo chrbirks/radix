@@ -12,10 +12,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from radix.engine.formatter import format_number
+from radix.engine.layouts import flatten_spec
 from radix.engine.nodes import (
     Assign,
     Binary,
     Call,
+    Field,
     Literal,
     Name,
     Node,
@@ -54,6 +56,10 @@ def _render(
     if isinstance(node, Binary):
         return _render_binary(node, variables, ans, parent_bp)
     if isinstance(node, Call):
+        if node.func == "fields" and node.args:
+            value_text = _render(node.args[0], variables, ans, 0)
+            parts = [value_text] + [_render_spec(a) for a in node.args[1:]]
+            return f"fields({', '.join(parts)})"
         args = ", ".join(_render(a, variables, ans, 0) for a in node.args)
         return f"{node.func}({args})"
     if isinstance(node, Slice):
@@ -63,6 +69,9 @@ def _render(
             return f"{operand}[{lsb}]"
         msb = _render(node.msb, variables, ans, 0)
         return f"{operand}[{msb}:{lsb}]"
+    if isinstance(node, Field):
+        operand = _render(node.operand, variables, ans, SLICE_BP)
+        return f"{operand}.{node.name}"
     if isinstance(node, Assign):
         return f"{node.target} ← {_render(node.expr, variables, ans, 0)}"
     return "?"  # pragma: no cover
@@ -89,6 +98,28 @@ def _render_binary(
     right = _render(node.right, variables, ans, bp + 1)
     op = _OP_DISPLAY.get(node.op, node.op)
     return _paren(f"{left} {op} {right}", bp, parent_bp)
+
+
+def _render_spec(node: Node) -> str:
+    """Render a fields()-spec argument as literal field syntax (no substitution)."""
+    parts = []
+    for leaf in flatten_spec(node):
+        if isinstance(leaf, Slice) and isinstance(leaf.operand, Name):
+            name = leaf.operand.ident
+            lsb = _render_spec_bound(leaf.lsb)
+            if leaf.msb is None:
+                parts.append(f"{name}[{lsb}]")
+            else:
+                parts.append(f"{name}[{_render_spec_bound(leaf.msb)}:{lsb}]")
+        else:
+            parts.append(_render(leaf, {}, None, 0))
+    return " ".join(parts)
+
+
+def _render_spec_bound(node: Node) -> str:
+    if isinstance(node, Literal) and isinstance(node.value, int):
+        return str(node.value)
+    return _render(node, {}, None, 0)
 
 
 def _is_atom(node: Node) -> bool:

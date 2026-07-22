@@ -58,6 +58,15 @@ class Slice(Node):
 
 
 @dataclass(frozen=True)
+class Field(Node):
+    """Postfix field access on a decoded value: CTRL(x).ADDR or ans.EN."""
+
+    operand: Node
+    name: str
+    name_span: Span
+
+
+@dataclass(frozen=True)
 class Assign(Node):
     """Statement-level `IDENT = expr`. Only valid at the top of an input line."""
 

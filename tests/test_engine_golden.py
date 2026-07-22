@@ -316,3 +316,149 @@ def test_slice_range_errors() -> None:
         run("0xAB[8:0]", word_size=8)
     with pytest.raises(EvalError, match="integer"):
         run("1.5[3]")
+
+
+# -- register field layouts -------------------------------------------------------
+
+def test_layout_define_and_decode() -> None:
+    session = Session()
+    session.evaluate("layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]")
+    outcome = session.evaluate("CTRL(0x8C01A0F3)")
+    assert outcome.value is not None
+    assert outcome.value.note == "EN=1 IRQ=0b000 ADDR=0xC01A0 CMD=0xF3"
+
+
+def test_layout_bare_command_lists_definitions() -> None:
+    session = Session()
+    outcome = session.evaluate("layout")
+    assert outcome.kind == "layout"
+    assert outcome.help_text == "no layouts defined"
+    session.evaluate("layout CTRL = EN[31]")
+    outcome = session.evaluate("layout")
+    assert outcome.help_text == "CTRL = layout EN[31]"
+
+
+def test_vars_lists_variables_then_layouts() -> None:
+    session = Session()
+    session.evaluate("x = 5")
+    session.evaluate("layout CTRL = EN[31]")
+    outcome = session.evaluate("vars")
+    assert outcome.help_text == "x = 5\nCTRL = layout EN[31]"
+
+
+def test_del_removes_layout_and_regresses_on_variables() -> None:
+    session = Session()
+    session.evaluate("layout CTRL = EN[31]")
+    session.evaluate("del CTRL")
+    assert session.layouts == {}
+    with pytest.raises(EvalError, match="unknown function 'CTRL'"):
+        session.evaluate("CTRL(1)")
+    session.evaluate("x = 1")
+    session.evaluate("del x")
+    with pytest.raises(EvalError):
+        session.evaluate("x")
+    with pytest.raises(EvalError, match="no variable or layout named 'nope'"):
+        session.evaluate("del nope")
+
+
+def test_clear_wipes_layouts_too() -> None:
+    session = Session()
+    session.evaluate("x = 1")
+    session.evaluate("layout CTRL = EN[31]")
+    session.evaluate("clear")
+    assert session.variables == {}
+    assert session.layouts == {}
+
+
+def test_layout_redefinition_overwrites_silently() -> None:
+    session = Session()
+    session.evaluate("layout CTRL = A[3:0]")
+    session.evaluate("layout CTRL = B[7:0]")
+    assert session.layouts["CTRL"].spec_text() == "B[7:0]"
+    outcome = session.evaluate("CTRL(0xFF)")
+    assert outcome.value is not None
+    assert outcome.value.note == "B=0xFF"
+
+
+def test_layout_variable_collision_both_directions() -> None:
+    session = Session()
+    session.evaluate("x = 5")
+    with pytest.raises(EvalError, match="'x' is already a variable — del it first"):
+        session.evaluate("layout x = A[3:0]")
+    session.evaluate("layout CTRL = A[3:0]")
+    with pytest.raises(EvalError, match="'CTRL' is already a layout — del it first"):
+        session.evaluate("CTRL = 5")
+
+
+def test_layout_reserved_names() -> None:
+    session = Session()
+    with pytest.raises(EvalError, match="'ans' is reserved and cannot be assigned"):
+        session.evaluate("layout ans = A[3:0]")
+    with pytest.raises(EvalError, match="'layout' is reserved and cannot be assigned"):
+        session.evaluate("layout layout = A[3:0]")
+    # No space / bare "=" forms fall through to the ordinary Assign path.
+    with pytest.raises(EvalError, match="'layout' is reserved and cannot be assigned"):
+        session.evaluate("layout = 3")
+    with pytest.raises(EvalError, match="'layout' is reserved and cannot be assigned"):
+        session.evaluate("layout=3")
+
+
+def test_layout_bad_forms_have_exact_spans() -> None:
+    session = Session()
+
+    line = "layout CTRL EN[31]"  # missing '='
+    with pytest.raises(EvalError) as exc_info:
+        session.evaluate(line)
+    exc = exc_info.value
+    assert exc.message == "layout: expected 'NAME = FIELD[msb:lsb] ...', e.g. layout CTRL = EN[31]"
+    assert (exc.span.start, exc.span.end) == (7, 18)
+
+    line = "layout CTRL ="  # empty spec
+    with pytest.raises(EvalError) as exc_info:
+        session.evaluate(line)
+    exc = exc_info.value
+    assert exc.message == "layout: expected at least one field, e.g. layout CTRL = EN[31]"
+    assert (exc.span.start, exc.span.end) == (13, 13)
+
+    line = "layout 5CTRL = EN[31]"  # not a valid identifier
+    with pytest.raises(EvalError) as exc_info:
+        session.evaluate(line)
+    exc = exc_info.value
+    assert exc.message == "'5CTRL' is not a valid layout name"
+    assert (exc.span.start, exc.span.end) == (7, 12)
+
+    line = "layout hFF = EN[31]"  # collides with the literal-prefix lexer rule
+    with pytest.raises(EvalError) as exc_info:
+        session.evaluate(line)
+    exc = exc_info.value
+    assert exc.message == "'hFF' is not a valid layout name"
+    assert (exc.span.start, exc.span.end) == (7, 10)
+
+    line = "layout CTRL = EN[31] EN[7:0]"  # duplicate field name, span shifted into full line
+    with pytest.raises(EvalError) as exc_info:
+        session.evaluate(line)
+    exc = exc_info.value
+    assert exc.message == "duplicate field name 'EN'"
+    assert (exc.span.start, exc.span.end) == (21, 23)
+    assert line[exc.span.start : exc.span.end] == "EN"
+
+
+def test_layout_word_size_interplay() -> None:
+    session = Session()
+    assert session.word_size == 32
+    session.evaluate("layout CTRL = EN[63]")  # wider than the current word size — fine to define
+    with pytest.raises(EvalError, match="field EN\\[63\\] is outside the 32-bit word"):
+        session.evaluate("CTRL(1)")
+    while session.word_size != 64:
+        session.cycle_word_size()
+    outcome = session.evaluate("CTRL(1)")
+    assert outcome.value is not None
+
+
+def test_layout_preview_has_no_side_effects() -> None:
+    session = Session()
+    outcome = session.preview("layout CTRL = EN[31]")
+    assert session.layouts == {}
+    assert outcome.kind == "layout"
+    assert outcome.target == "CTRL"
+    assert outcome.help_text == "layout CTRL = EN[31]"

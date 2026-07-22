@@ -323,6 +323,14 @@ class MainWindow(QMainWindow):
             self._toast(f"deleted {outcome.target}")
             self._refresh_vars_pane()
             return
+        if outcome.kind == "layout":
+            self.input.clear()
+            if outcome.target is not None:
+                self._toast(outcome.help_text or f"defined layout {outcome.target}")
+                self._refresh_vars_pane()
+            else:
+                self._show_vars()
+            return
         if outcome.kind == "clear":
             self.model.clear()
             if self.store is not None:
@@ -401,6 +409,12 @@ class MainWindow(QMainWindow):
         if outcome.kind == "del":
             self._set_preview(f"press Enter to delete {outcome.target}", error=False)
             return
+        if outcome.kind == "layout":
+            if outcome.target is not None:
+                self._set_preview(f"press Enter to define layout {outcome.target}", error=False)
+            else:
+                self._set_preview("press Enter to list layouts", error=False)
+            return
         if outcome.kind == "clear":
             self._set_preview("press Enter to clear variables and history", error=False)
             return
@@ -424,7 +438,10 @@ class MainWindow(QMainWindow):
         number = value.number if value is not None else None
         self.channels.set_live(number if isinstance(number, int) else None)
         if isinstance(number, int):
-            self.intview.show_value(number, self.session.word_size, self.session.signed)
+            assert value is not None
+            self.intview.show_value(
+                number, self.session.word_size, self.session.signed, layout=value.layout
+            )
             return
         float_views = (
             self.session.float_views_for(value)
@@ -662,6 +679,7 @@ class MainWindow(QMainWindow):
             self.intview.scratch if self.intview.active else None,
             self.session.word_size,
             self.session.signed,
+            layout=self.intview.reg_layout,
         )
         self._update_preview()
 
@@ -735,7 +753,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_vars_pane(self) -> None:
         self.vars_pane.clear()
-        if not self.session.variables:
+        if not self.session.variables and not self.session.layouts:
             placeholder = QListWidgetItem("no variables -- assign with  x = 42")
             placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
             self.vars_pane.addItem(placeholder)
@@ -745,13 +763,20 @@ class MainWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, name)
             item.setToolTip("click to insert; right-click or `del <name>` to remove")
             self.vars_pane.addItem(item)
+        for name, lyt in self.session.layouts.items():
+            item = QListWidgetItem(f"{name} = layout {lyt.spec_text()}")
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            item.setToolTip("click to insert a call; right-click or `del <name>` to remove")
+            self.vars_pane.addItem(item)
 
     def _insert_var_name(self, item: QListWidgetItem) -> None:
         name = item.data(Qt.ItemDataRole.UserRole)
-        if name:
-            self.completer.suppress_next()
-            self.input.insertPlainText(name)
-            self.input.setFocus()
+        if not name:
+            return
+        text = f"{name}(" if name in self.session.layouts else name
+        self.completer.suppress_next()
+        self.input.insertPlainText(text)
+        self.input.setFocus()
 
     def _vars_context_menu(self, pos: QPoint) -> None:
         item = self.vars_pane.itemAt(pos)
@@ -761,7 +786,10 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         delete = menu.addAction(f"delete {name}")
         if menu.exec(self.vars_pane.mapToGlobal(pos)) is delete:
-            del self.session.variables[name]
+            if name in self.session.variables:
+                del self.session.variables[name]
+            else:
+                del self.session.layouts[name]
             self._refresh_vars_pane()
             self._toast(f"deleted {name}")
 

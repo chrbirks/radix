@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 import mpmath
 
 if TYPE_CHECKING:
+    from radix.engine.layouts import RegLayout
     from radix.engine.viz import VizPayload
 
 # Working precision (decimal digits) for real-number math. Display precision is
@@ -40,6 +41,7 @@ class Value:
     prefer_si: bool = False  # period()/freq(): render with an SI suffix (10n, 125M)
     note: str | None = None  # e.g. fix(): quantization error, shown next to the result
     viz: VizPayload | None = None  # structured payload for the UI's VizPanel
+    layout: RegLayout | None = None  # field layout for register-decode results
 
     @property
     def is_integer(self) -> bool:
