@@ -521,7 +521,7 @@ class MainWindow(QMainWindow):
             add("copy as bin", "copy_bin")
         if entry.value is not None:
             menu.addSeparator()
-            add("pin as channel", "pin")
+            add("pin value", "pin")
         menu.addSeparator()
         add("recall", "recall")
         add("delete entry", "delete")
@@ -606,7 +606,7 @@ class MainWindow(QMainWindow):
         text = self.session.format_value(value)
         assigned = self.channels.pin(value, text, label)
         if assigned is None:
-            self._toast("channel rack full -- unpin one")
+            self._toast("pinned rack full -- unpin one")
         else:
             self._toast(f"pinned {assigned}")
 

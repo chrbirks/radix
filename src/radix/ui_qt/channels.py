@@ -256,7 +256,7 @@ class ChannelsRack(QWidget):
         self.word_size = 64
         self._live: int | None = None
 
-        self.hint_label = QLabel("no channels -- Alt+P pins the last result")
+        self.hint_label = QLabel("nothing pinned -- Alt+P pins the last result")
         self.hint_label.setProperty("class", "chanHint")
 
         self.layout_ = QVBoxLayout(self)

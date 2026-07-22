@@ -959,7 +959,7 @@ def test_bit_grid_wraps_to_window_width(qtbot, window: MainWindow) -> None:  # t
 def test_empty_rack_shows_hint(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     assert window.channels.channels == []
     assert not window.channels.hint_label.isHidden()
-    assert window.channels.hint_label.text() == "no channels -- Alt+P pins the last result"
+    assert window.channels.hint_label.text() == "nothing pinned -- Alt+P pins the last result"
 
 
 def test_pin_via_history_context_menu(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -997,7 +997,7 @@ def test_channel_rack_caps_at_max_channels(qtbot, window: MainWindow) -> None:  
     assert len(window.channels.channels) == 8
     window._pin_value(Value(99), None)
     assert len(window.channels.channels) == 8
-    assert window.toast_label.text() == "channel rack full -- unpin one"
+    assert window.toast_label.text() == "pinned rack full -- unpin one"
 
 
 def test_base_cycle_reformats_pinned_channel(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]

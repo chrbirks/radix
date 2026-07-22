@@ -27,7 +27,7 @@ class Inspector(QWidget):
         self.vizpanel = VizPanel(palette)
         self.trace_caption.hide()
         self.intview = IntegerView(palette, clipboard_setter)
-        self.channels_caption = ZoneCaption("CHANNELS")
+        self.channels_caption = ZoneCaption("PINNED")
         self.channels_caption.set_palette(palette)
         self.channels = ChannelsRack(palette, clipboard_setter)
 
