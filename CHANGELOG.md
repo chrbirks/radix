@@ -17,6 +17,17 @@ ambiguity to resolve about major/minor/patch.
   word sizes 8/16 — since the float view is rarely needed and previously
   appeared on nearly every non-integer result. Persisted across restarts.
 
+### Fixed
+
+- The history pane could grow a spurious horizontal scrollbar during normal
+  use, with no long results involved. `QListView`'s default
+  `ResizeMode.Fixed` only lays row widths out once, at first show — a later
+  viewport-width change (a window resize, or the vertical scrollbar popping
+  in as entries accumulate) left existing rows sized to a stale width.
+  Switched `history_view` to `ResizeMode.Adjust` (keeps row widths synced to
+  the viewport) and declared `ScrollBarAlwaysOff` on its horizontal axis
+  (this list never legitimately needs it).
+
 ## [5] - 2026-07-13
 
 ### Added

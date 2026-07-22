@@ -475,6 +475,33 @@ def test_history_scrolls_to_bottom_on_first_show(qtbot, tmp_path) -> None:  # ty
     assert scrollbar.value() == scrollbar.maximum()
 
 
+def test_history_no_horizontal_scrollbar_after_resize(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+    for i in range(40):
+        store.append(f"{i} + 1", str(i + 1), "", value=i + 1)
+
+    win = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win)
+    win.resize(640, 700)
+    win.show()
+    qtbot.waitExposed(win)
+    hbar = win.history_view.horizontalScrollBar()
+    assert not hbar.isVisible()
+
+    # QListView.ResizeMode.Fixed (Qt's default) only lays rows out the first
+    # time the view is shown; narrowing the window afterwards changes the
+    # viewport width without re-syncing existing row rects to it, so a bogus
+    # horizontal scrollbar can appear even though no entry's text is
+    # anywhere near this wide.
+    win.resize(520, 700)  # app's own declared minimum (setMinimumSize)
+    assert not hbar.isVisible()
+
+
 def test_vars_pane_lists_and_inserts(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     _submit(qtbot, window, "x = 0xFF")
     _submit(qtbot, window, "vars")

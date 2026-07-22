@@ -105,6 +105,16 @@ class MainWindow(QMainWindow):
         self.history_view.clicked.connect(self._inspect_from_view)
         self.history_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.history_view.customContextMenuRequested.connect(self._history_context_menu)
+        # Row width comes from the viewport at layout time (the delegate
+        # draws unwrapped text straight into option.rect, never measuring
+        # content) — Fixed (Qt's default) only lays that out once, so a
+        # later viewport-width change (the vertical scrollbar popping in as
+        # entries accumulate, or a window resize) leaves stale, too-wide
+        # rows behind and produces a bogus horizontal scrollbar. Adjust
+        # keeps widths synced; AlwaysOff is belt-and-suspenders since this
+        # list never legitimately needs horizontal scrolling.
+        self.history_view.setResizeMode(QListView.ResizeMode.Adjust)
+        self.history_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.help_pane = QTextEdit()
         self.help_pane.setObjectName("helpPane")
