@@ -24,6 +24,7 @@ MAX_CHANNELS = 8
 MINI_STRIP_H = 12
 STRIP_PAD = 6
 MINI_NIBBLE_GAP = 3
+MINI_CELL_GAP = 1
 
 
 @dataclass
@@ -70,7 +71,11 @@ class MiniBitStrip(QWidget):
         off = QColor(p.bit_off)
         word_size = max(1, self.word_size)
         nibble_gaps = max(0, word_size // 4 - 1)
-        usable = max(0.0, self.width() - nibble_gaps * MINI_NIBBLE_GAP)
+        cell_gaps = word_size - 1
+        usable = max(
+            0.0,
+            self.width() - nibble_gaps * MINI_NIBBLE_GAP - cell_gaps * MINI_CELL_GAP,
+        )
         cell_w = usable / word_size
         painter.setPen(Qt.PenStyle.NoPen)
         x = 0.0
@@ -80,8 +85,10 @@ class MiniBitStrip(QWidget):
             painter.setBrush(on if set_ else off)
             painter.drawRect(QRectF(x, 0, cell_w, self.height()))
             x += cell_w
-            if pos % 4 == 3 and pos != word_size - 1:
-                x += MINI_NIBBLE_GAP
+            if pos != word_size - 1:
+                x += MINI_CELL_GAP
+                if pos % 4 == 3:
+                    x += MINI_NIBBLE_GAP
         painter.end()
 
 

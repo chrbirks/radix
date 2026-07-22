@@ -19,6 +19,11 @@ ambiguity to resolve about major/minor/patch.
 
 ### Fixed
 
+- PINNED's mini bit strips drew adjacent "set" bits edge-to-edge within a
+  nibble, so consecutive 1s visually merged into one solid block instead of
+  reading as distinct bits. Added a small gap between every cell (on top of
+  the existing larger nibble-boundary gap), matching the spacing convention
+  already used by REGISTER's bit grid.
 - The history pane could grow a spurious horizontal scrollbar during normal
   use, with no long results involved. `QListView`'s default
   `ResizeMode.Fixed` only lays row widths out once, at first show — a later
