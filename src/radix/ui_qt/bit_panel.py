@@ -31,7 +31,8 @@ GAP = 4
 NIBBLE_GAP = 10
 HEX_H = 20  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
-FIELD_H = 16  # field-band strip above the hex strip, present only with a layout
+FIELD_H = 20  # field-band strip above the hex strip, present only with a layout
+FIELD_LABEL_GAP = 4  # breathing room between the field name and its bracket line
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
 LANE_ROWS = 4  # max simultaneous lanes (HEX/DEC/BIN/ASC, or HEX/SGN/EXP/MAN)
@@ -261,7 +262,9 @@ class BitGrid(QWidget):
                 if seg_start == pos_start:
                     painter.setFont(micro_font)
                     painter.setPen(color)
-                    label_rect = QRectF(x_left, y_top, x_right - x_left, y_line - y_top)
+                    label_rect = QRectF(
+                        x_left, y_top, x_right - x_left, y_line - y_top - FIELD_LABEL_GAP
+                    )
                     text = painter.fontMetrics().elidedText(
                         name, Qt.TextElideMode.ElideRight, int(label_rect.width())
                     )
