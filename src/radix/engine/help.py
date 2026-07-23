@@ -31,14 +31,14 @@ _OPERATOR_HELP: list[tuple[str, str, str]] = [
 ]
 
 _COMMAND_HELP: dict[str, str] = {
-    "layout": (
-        "layout NAME = FIELD[msb:lsb] ... — define a register field layout\n"
-        "  layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]   define\n"
-        "  layout                                                list all layouts\n"
-        "  del CTRL                                              delete a layout\n"
+    "csr": (
+        "csr NAME = FIELD[msb:lsb] ... — define a CSR field layout\n"
+        "  csr CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]      define\n"
+        "  csr                                                   list all csrs\n"
+        "  del CTRL                                              delete a csr\n"
         "  CTRL(0x8C01A0F3)                                      decode a value\n"
         "  ans.ADDR                                              read a field as an int\n"
-        "  fields(x, EN[7] CMD[3:0])                             one-shot decode, no name"
+        "  csr(x, EN[7] CMD[3:0])                                one-shot decode, no name"
     ),
 }
 
@@ -59,7 +59,7 @@ Integers   Results that are integers also show hex/dec/bin and the bit panel.
            Word size and signedness affect bit operators and that display only.
 Commands   help        this overview            help <name>   one operator/function
            clear       wipe variables & history
-           layout NAME = FIELD[msb:lsb] ...   define a register field layout
+           csr NAME = FIELD[msb:lsb] ...      define a CSR field layout
 """
 
 
@@ -120,6 +120,8 @@ def general_help_html(shortcuts: str | None = None) -> str:
 
 def topic_help(topic: str) -> str | None:
     """Help for one function or operator; None if the topic is unknown."""
+    if topic in _COMMAND_HELP:
+        return _COMMAND_HELP[topic]
     spec = FUNCTIONS.get(topic)
     if spec is not None:
         lo, hi = spec.arity
@@ -132,6 +134,4 @@ def topic_help(topic: str) -> str | None:
     for op, summary, example in _OPERATOR_HELP:
         if topic == op:
             return f"{op} — {summary}\nExample: {example}"
-    if topic in _COMMAND_HELP:
-        return _COMMAND_HELP[topic]
     return None

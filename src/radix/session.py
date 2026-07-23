@@ -14,6 +14,13 @@ from typing import Any
 from radix.engine import evaluator, render
 from radix.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
 from radix.engine import help as help_mod
+from radix.engine.csr import (
+    Csr,
+    csr_from_json,
+    csr_from_nodes,
+    csr_to_json,
+    flatten_spec,
+)
 from radix.engine.errors import CalcError, EvalError, Span, shift
 from radix.engine.formatter import (
     FloatViews,
@@ -24,13 +31,6 @@ from radix.engine.formatter import (
     integer_views,
 )
 from radix.engine.functions import CONSTANTS, FUNCTIONS, EvalContext
-from radix.engine.layouts import (
-    RegLayout,
-    flatten_spec,
-    layout_from_json,
-    layout_from_nodes,
-    layout_to_json,
-)
 from radix.engine.lexer import tokenize
 from radix.engine.nodes import Assign
 from radix.engine.parser import parse
@@ -41,7 +41,7 @@ NOTATIONS = ("auto", "sci", "eng", "eng_si")
 INT_BASES = ("dec", "hex", "bin")
 
 RESERVED_NAMES = (
-    frozenset({"ans", "help", "clear", "vars", "del", "layout"})
+    frozenset({"ans", "help", "clear", "vars", "del", "csr"})
     | frozenset(CONSTANTS)
     | frozenset(FUNCTIONS)
 )
@@ -51,7 +51,7 @@ RESERVED_NAMES = (
 class Outcome:
     """Result of evaluating one input line."""
 
-    kind: str  # "value" | "assign" | "help" | "clear" | "vars" | "del" | "layout" | "empty"
+    kind: str  # "value" | "assign" | "help" | "clear" | "vars" | "del" | "csr" | "empty"
     value: Value | None = None
     target: str | None = None  # assignment target
     normalized: str = ""  # resolved pretty-print of the parse, for the preview
@@ -73,7 +73,7 @@ class Session:
     int_base: str = "dec"  # display base for integer results (dec/hex/bin)
     show_float_view: bool = False  # IEEE-754 breakdown in READOUT/REGISTER
     variables: dict[str, Value] = field(default_factory=dict)
-    layouts: dict[str, RegLayout] = field(default_factory=dict)
+    csrs: dict[str, Csr] = field(default_factory=dict)
     ans: Value | None = None
 
     # -- settings ------------------------------------------------------------
@@ -114,12 +114,12 @@ class Session:
                 raise EvalError(
                     f"{node.target!r} is reserved and cannot be assigned", node.target_span
                 )
-            if node.target in self.layouts:
+            if node.target in self.csrs:
                 raise EvalError(
-                    f"{node.target!r} is already a layout — del it first", node.target_span
+                    f"{node.target!r} is already a csr — del it first", node.target_span
                 )
             value = evaluator.evaluate(
-                node.expr, self.context, self.variables, self.ans, layouts=self.layouts
+                node.expr, self.context, self.variables, self.ans, csrs=self.csrs
             )
             value = evaluator.guard_finite(value, node.expr.span)
             if commit:
@@ -127,7 +127,7 @@ class Session:
                 self.ans = value
             return Outcome("assign", value, node.target, normalized=preview)
         value = evaluator.evaluate(
-            node, self.context, self.variables, self.ans, layouts=self.layouts
+            node, self.context, self.variables, self.ans, csrs=self.csrs
         )
         value = evaluator.guard_finite(value, node.span)
         if commit:
@@ -151,12 +151,12 @@ class Session:
         if word == "clear" and not rest:
             if commit:
                 self.variables.clear()
-                self.layouts.clear()
+                self.csrs.clear()
                 self.ans = None
             return Outcome("clear")
         if word == "vars" and not rest:
             lines = [f"{k} = {self.format_value(v)}" for k, v in self.variables.items()]
-            lines += [f"{name} = layout {lyt.spec_text()}" for name, lyt in self.layouts.items()]
+            lines += [f"{name} = csr {c.spec_text()}" for name, c in self.csrs.items()]
             return Outcome("vars", help_text="\n".join(lines) or "no variables defined")
         if word == "del":
             if rest.startswith("="):
@@ -167,27 +167,27 @@ class Session:
                 if commit:
                     del self.variables[rest]
                 return Outcome("del", target=rest)
-            if rest in self.layouts:
+            if rest in self.csrs:
                 if commit:
-                    del self.layouts[rest]
+                    del self.csrs[rest]
                 return Outcome("del", target=rest)
             raise EvalError(
-                f"no variable or layout named {rest!r}", Span(len(word) + 1, len(line))
+                f"no variable or csr named {rest!r}", Span(len(word) + 1, len(line))
             )
-        if word == "layout":
+        if word == "csr":
             if rest.startswith("="):
-                return None  # `layout = ...` is an assignment attempt → reserved-name error
+                return None  # `csr = ...` is an assignment attempt → reserved-name error
             if not rest:
                 lines = [
-                    f"{name} = layout {lyt.spec_text()}" for name, lyt in self.layouts.items()
+                    f"{name} = csr {c.spec_text()}" for name, c in self.csrs.items()
                 ]
-                return Outcome("layout", help_text="\n".join(lines) or "no layouts defined")
-            return self._layout_command(line, word, rest, commit)
+                return Outcome("csr", help_text="\n".join(lines) or "no csrs defined")
+            return self._csr_command(line, word, rest, commit)
         return None
 
-    def _layout_command(self, line: str, word: str, rest: str, commit: bool) -> Outcome:
+    def _csr_command(self, line: str, word: str, rest: str, commit: bool) -> Outcome:
         usage_error = EvalError(
-            "layout: expected 'NAME = FIELD[msb:lsb] ...', e.g. layout CTRL = EN[31]",
+            "csr: expected 'NAME = FIELD[msb:lsb] ...', e.g. csr CTRL = EN[31]",
             Span(len(word) + 1, len(line)),
         )
         if "=" not in rest:
@@ -200,7 +200,7 @@ class Session:
         name_span = Span(name_start, name_start + len(name))
         toks = tokenize(name)
         if not (len(toks) == 2 and toks[0].kind == "IDENT" and toks[1].kind == "EOF"):
-            raise EvalError(f"{name!r} is not a valid layout name", name_span)
+            raise EvalError(f"{name!r} is not a valid csr name", name_span)
         if name in RESERVED_NAMES:
             raise EvalError(f"{name!r} is reserved and cannot be assigned", name_span)
         if name in self.variables:
@@ -208,7 +208,7 @@ class Session:
         spec_text = spec_raw.strip()
         if not spec_text:
             raise EvalError(
-                "layout: expected at least one field, e.g. layout CTRL = EN[31]",
+                "csr: expected at least one field, e.g. csr CTRL = EN[31]",
                 Span(len(line), len(line)),
             )
         eq_index = name_start + len(name_raw)
@@ -218,13 +218,13 @@ class Session:
         try:
             node = parse(spec_text)
             leaves = flatten_spec(node)
-            new_layout = layout_from_nodes(leaves, name=name)
+            new_csr = csr_from_nodes(leaves, name=name)
         except CalcError as exc:
             raise type(exc)(exc.message, shift(exc.span, spec_offset)) from exc
         if commit:
-            self.layouts[name] = new_layout
+            self.csrs[name] = new_csr
         return Outcome(
-            "layout", target=name, help_text=f"layout {name} = {new_layout.spec_text()}"
+            "csr", target=name, help_text=f"csr {name} = {new_csr.spec_text()}"
         )
 
     # -- display helpers -------------------------------------------------------
@@ -259,10 +259,10 @@ class Session:
     # -- persistence -------------------------------------------------------
 
     def state_to_json(self) -> dict[str, Any]:
-        """Variables, layouts, and ``ans`` — the state that persists across restarts."""
+        """Variables, csrs, and ``ans`` — the state that persists across restarts."""
         return {
             "variables": {name: value_to_json(v) for name, v in self.variables.items()},
-            "layouts": {name: layout_to_json(lyt) for name, lyt in self.layouts.items()},
+            "csrs": {name: csr_to_json(c) for name, c in self.csrs.items()},
             "ans": value_to_json(self.ans) if self.ans is not None else None,
         }
 
@@ -277,16 +277,16 @@ class Session:
                 variables[name] = value_from_json(entry)
             except (KeyError, TypeError, ValueError):
                 continue
-        layouts: dict[str, RegLayout] = {}
-        for name, entry in data.get("layouts", {}).items():
+        csrs: dict[str, Csr] = {}
+        for name, entry in data.get("csrs", {}).items():
             if name in RESERVED_NAMES or name in variables:
                 continue
             try:
-                layouts[name] = layout_from_json(entry)
+                csrs[name] = csr_from_json(entry)
             except (KeyError, TypeError, ValueError):
                 continue
         self.variables = variables
-        self.layouts = layouts
+        self.csrs = csrs
         ans_data = data.get("ans")
         if ans_data is not None:
             try:

@@ -28,15 +28,15 @@ def test_evaluate_prints_integer_views(capsys: pytest.CaptureFixture[str]) -> No
 
 
 def test_evaluate_decodes_register_fields(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["-e", "fields(0xF3, MODE[7:4] CMD[3:0])"]) == 0
+    assert main(["-e", "csr(0xF3, MODE[7:4] CMD[3:0])"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("243")  # 0xF3 decimal
     assert "MODE=0b1111" in out
     assert "CMD=0b0011" in out
 
 
-def test_evaluate_layout_definition_prints_confirmation(
+def test_evaluate_csr_definition_prints_confirmation(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(["-e", "layout CTRL = EN[31]"]) == 0
+    assert main(["-e", "csr CTRL = EN[31]"]) == 0
     assert "CTRL" in capsys.readouterr().out

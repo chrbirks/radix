@@ -53,7 +53,7 @@ def color_for(kind: str, palette: Palette) -> QColor:
             "operator": palette.syn_operator,
             "paren": palette.muted,
             "ident": palette.text,
-            "layout": palette.syn_function,
+            "csr": palette.syn_function,
         }[kind]
     )
 

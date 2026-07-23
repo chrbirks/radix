@@ -21,8 +21,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from radix.engine.csr import Csr, format_field_value
 from radix.engine.formatter import FloatViews, format_int_base, integer_views
-from radix.engine.layouts import RegLayout, format_field_value
 from radix.ui_qt.theme import FONT_MICRO, Palette
 from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
@@ -31,7 +31,7 @@ GAP = 4
 NIBBLE_GAP = 10
 HEX_H = 20  # strip above each cell row for per-nibble hex digits
 INDEX_H = 18  # strip below each cell row for bit-index labels
-FIELD_H = 20  # field-band strip above the hex strip, present only with a layout
+FIELD_H = 20  # field-band strip above the hex strip, present only with a csr
 FIELD_LABEL_GAP = 4  # breathing room between the field name and its bracket line
 ROW_H = HEX_H + CELL + GAP + INDEX_H
 BYTE_WIDTH = 8 * (CELL + GAP) + 2 * NIBBLE_GAP  # one byte group incl. nibble gaps
@@ -351,10 +351,7 @@ class IntegerView(QWidget):
         self.active = False
         self._ref: tuple[str, int] | None = None  # armed channel: (label, value)
         self.float_mode: FloatViews | None = None  # read-only IEEE-754 display
-        # Field layout for the shown value. Named `reg_layout`, not `layout`
-        # (QWidget already defines a `layout()` method returning the widget's
-        # own QLayout -- an instance attribute named `layout` would shadow it).
-        self.reg_layout: RegLayout | None = None
+        self.csr: Csr | None = None  # field layout for the shown value
 
         self.rows: dict[str, tuple[QLabel, QLabel]] = {}
         self._copy_texts: dict[str, str] = {}
@@ -431,7 +428,7 @@ class IntegerView(QWidget):
         word_size: int,
         signed: bool,
         float_views: FloatViews | None = None,
-        layout: RegLayout | None = None,
+        csr: Csr | None = None,
     ) -> None:
         # scratch is kept unmasked: cycling the word size must only change how
         # the value is *displayed*, never destroy its upper bits.
@@ -442,7 +439,7 @@ class IntegerView(QWidget):
         self.word_size = word_size
         self.signed = signed
         self.float_mode = float_views if value is None else None
-        self.reg_layout = layout
+        self.csr = csr
         was_active = self.active
         self.active = value is not None
         if value is not None:
@@ -559,8 +556,8 @@ class IntegerView(QWidget):
         else:
             self.delta_label.setText("")
         named_fields = (
-            tuple((f.name, f.msb, f.lsb) for f in self.reg_layout.fields)
-            if self.reg_layout
+            tuple((f.name, f.msb, f.lsb) for f in self.csr.fields)
+            if self.csr
             else None
         )
         self.grid_widget.set_state(
@@ -570,13 +567,13 @@ class IntegerView(QWidget):
         self._refresh_field_table()
 
     def _refresh_field_table(self) -> None:
-        if self.reg_layout is None or not self.active:
+        if self.csr is None or not self.active:
             self.field_table.setVisible(False)
             return
         self.field_table.setVisible(True)
         field_bands = self.palette_tokens.field_bands
         parts = []
-        for field_index, f in enumerate(self.reg_layout.fields):
+        for field_index, f in enumerate(self.csr.fields):
             bracket = f"[{f.msb}]" if f.msb == f.lsb else f"[{f.msb}:{f.lsb}]"
             if f.msb >= self.word_size:
                 parts.append(
@@ -596,9 +593,9 @@ class IntegerView(QWidget):
         self.field_table.setText("&nbsp;&nbsp;&nbsp;".join(parts))
 
     def _on_field_link(self, name: str) -> None:
-        if self.reg_layout is None:
+        if self.csr is None:
             return
-        f = self.reg_layout.field(name)
+        f = self.csr.field(name)
         if f is None:
             return
         self.grid_widget.set_selection((f.msb, f.lsb))

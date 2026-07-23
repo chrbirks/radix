@@ -1,4 +1,4 @@
-"""Round-trip tests for persisting variables/layouts/ans across restarts."""
+"""Round-trip tests for persisting variables/csrs/ans across restarts."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import mpmath
 
-from radix.engine.layouts import RegField, RegLayout, layout_from_json, layout_to_json
+from radix.engine.csr import Csr, CsrField, csr_from_json, csr_to_json
 from radix.engine.values import Value, value_from_json, value_to_json
 from radix.session import Session
 
@@ -19,7 +19,7 @@ def test_value_to_json_roundtrips_int() -> None:
     assert restored.declared_width == 8
     assert restored.prefer_si is True
     assert restored.note == "a note"
-    assert restored.layout is None
+    assert restored.csr is None
     assert restored.viz is None
 
 
@@ -38,30 +38,30 @@ def test_value_to_json_roundtrips_special_reals() -> None:
         assert restored.number == x
 
 
-def test_value_to_json_roundtrips_nested_layout() -> None:
-    layout = RegLayout("CTRL", (RegField("EN", 31, 31), RegField("ADDR", 27, 8)))
-    v = Value(0x8C01A0F3, layout=layout)
+def test_value_to_json_roundtrips_nested_csr() -> None:
+    csr = Csr("CTRL", (CsrField("EN", 31, 31), CsrField("ADDR", 27, 8)))
+    v = Value(0x8C01A0F3, csr=csr)
     restored = value_from_json(json.loads(json.dumps(value_to_json(v))))
-    assert restored.layout is not None
-    assert restored.layout.name == "CTRL"
-    assert restored.layout.fields == layout.fields
+    assert restored.csr is not None
+    assert restored.csr.name == "CTRL"
+    assert restored.csr.fields == csr.fields
 
 
-def test_layout_to_json_roundtrip() -> None:
-    layout = RegLayout("CTRL", (RegField("EN", 31, 31), RegField("IRQ", 30, 28)))
-    restored = layout_from_json(json.loads(json.dumps(layout_to_json(layout))))
-    assert restored == layout
+def test_csr_to_json_roundtrip() -> None:
+    csr = Csr("CTRL", (CsrField("EN", 31, 31), CsrField("IRQ", 30, 28)))
+    restored = csr_from_json(json.loads(json.dumps(csr_to_json(csr))))
+    assert restored == csr
 
 
-def test_layout_to_json_roundtrip_anonymous() -> None:
-    layout = RegLayout(None, (RegField("CMD", 7, 0),))
-    restored = layout_from_json(json.loads(json.dumps(layout_to_json(layout))))
-    assert restored == layout
+def test_csr_to_json_roundtrip_anonymous() -> None:
+    csr = Csr(None, (CsrField("CMD", 7, 0),))
+    restored = csr_from_json(json.loads(json.dumps(csr_to_json(csr))))
+    assert restored == csr
 
 
 def test_session_state_roundtrip() -> None:
     session = Session()
-    session.evaluate("layout CTRL = EN[31] ADDR[27:8]")
+    session.evaluate("csr CTRL = EN[31] ADDR[27:8]")
     session.evaluate("x = CTRL(0x8C01A0F3)")
     session.evaluate("y = 1/3")
 
@@ -71,10 +71,10 @@ def test_session_state_roundtrip() -> None:
     restored.load_state_json(blob)
     assert set(restored.variables) == {"x", "y"}
     assert restored.variables["x"].number == 0x8C01A0F3
-    assert restored.variables["x"].layout is not None
-    assert restored.variables["x"].layout.name == "CTRL"
+    assert restored.variables["x"].csr is not None
+    assert restored.variables["x"].csr.name == "CTRL"
     assert restored.variables["y"].number == session.variables["y"].number
-    assert set(restored.layouts) == {"CTRL"}
+    assert set(restored.csrs) == {"CTRL"}
     assert restored.ans is not None
     assert session.ans is not None
     assert restored.ans.number == session.ans.number
@@ -87,7 +87,7 @@ def test_session_state_roundtrip_without_ans() -> None:
     restored.load_state_json(session.state_to_json())
     assert restored.ans is None
     assert restored.variables == {}
-    assert restored.layouts == {}
+    assert restored.csrs == {}
 
 
 def test_load_state_json_skips_corrupt_variable_entries() -> None:
@@ -103,16 +103,16 @@ def test_load_state_json_skips_corrupt_variable_entries() -> None:
     assert restored.variables["y"].number == 6
 
 
-def test_load_state_json_skips_corrupt_layout_entries() -> None:
+def test_load_state_json_skips_corrupt_csr_entries() -> None:
     session = Session()
-    session.evaluate("layout CTRL = EN[31]")
-    session.evaluate("layout STATUS = IRQ[3:0]")
+    session.evaluate("csr CTRL = EN[31]")
+    session.evaluate("csr STATUS = IRQ[3:0]")
     blob = session.state_to_json()
-    blob["layouts"]["CTRL"] = {"garbage": True}
+    blob["csrs"]["CTRL"] = {"garbage": True}
 
     restored = Session()
     restored.load_state_json(blob)
-    assert set(restored.layouts) == {"STATUS"}
+    assert set(restored.csrs) == {"STATUS"}
 
 
 def test_load_state_json_skips_reserved_names() -> None:

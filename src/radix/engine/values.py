@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 import mpmath
 
 if TYPE_CHECKING:
-    from radix.engine.layouts import RegLayout
+    from radix.engine.csr import Csr
     from radix.engine.viz import VizPayload
 
 # Working precision (decimal digits) for real-number math. Display precision is
@@ -41,7 +41,7 @@ class Value:
     prefer_si: bool = False  # period()/freq(): render with an SI suffix (10n, 125M)
     note: str | None = None  # e.g. fix(): quantization error, shown next to the result
     viz: VizPayload | None = None  # structured payload for the UI's VizPanel
-    layout: RegLayout | None = None  # field layout for register-decode results
+    csr: Csr | None = None  # csr field layout for register-decode results
 
     @property
     def is_integer(self) -> bool:
@@ -69,7 +69,7 @@ def value_to_json(value: Value) -> dict[str, Any]:
     precision. ``viz`` is dropped: it's a transient display payload
     recomputed by evaluation, not meaningful to freeze.
     """
-    from radix.engine.layouts import layout_to_json
+    from radix.engine.csr import csr_to_json
 
     if isinstance(value.number, int):
         number: dict[str, Any] = {"kind": "int", "value": value.number}
@@ -80,13 +80,13 @@ def value_to_json(value: Value) -> dict[str, Any]:
         "declared_width": value.declared_width,
         "prefer_si": value.prefer_si,
         "note": value.note,
-        "layout": layout_to_json(value.layout) if value.layout is not None else None,
+        "csr": csr_to_json(value.csr) if value.csr is not None else None,
     }
 
 
 def value_from_json(data: dict[str, Any]) -> Value:
     """Inverse of ``value_to_json``. Raises on malformed data."""
-    from radix.engine.layouts import layout_from_json
+    from radix.engine.csr import csr_from_json
 
     number_data = data["number"]
     number: Number
@@ -94,11 +94,11 @@ def value_from_json(data: dict[str, Any]) -> Value:
         number = number_data["value"]
     else:
         number = mpmath.make_mpf(tuple(number_data["mpf"]))
-    layout_data = data["layout"]
+    csr_data = data["csr"]
     return Value(
         number=number,
         declared_width=data["declared_width"],
         prefer_si=data["prefer_si"],
         note=data["note"],
-        layout=layout_from_json(layout_data) if layout_data is not None else None,
+        csr=csr_from_json(csr_data) if csr_data is not None else None,
     )

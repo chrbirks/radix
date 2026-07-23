@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from radix.engine.csr import flatten_spec
 from radix.engine.formatter import format_number
-from radix.engine.layouts import flatten_spec
 from radix.engine.nodes import (
     Assign,
     Binary,
@@ -56,10 +56,10 @@ def _render(
     if isinstance(node, Binary):
         return _render_binary(node, variables, ans, parent_bp)
     if isinstance(node, Call):
-        if node.func == "fields" and node.args:
+        if node.func == "csr" and node.args:
             value_text = _render(node.args[0], variables, ans, 0)
             parts = [value_text] + [_render_spec(a) for a in node.args[1:]]
-            return f"fields({', '.join(parts)})"
+            return f"csr({', '.join(parts)})"
         args = ", ".join(_render(a, variables, ans, 0) for a in node.args)
         return f"{node.func}({args})"
     if isinstance(node, Slice):
@@ -101,7 +101,7 @@ def _render_binary(
 
 
 def _render_spec(node: Node) -> str:
-    """Render a fields()-spec argument as literal field syntax (no substitution)."""
+    """Render a csr()-spec argument as literal field syntax (no substitution)."""
     parts = []
     for leaf in flatten_spec(node):
         if isinstance(leaf, Slice) and isinstance(leaf.operand, Name):

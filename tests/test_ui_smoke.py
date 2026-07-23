@@ -131,7 +131,7 @@ def test_result_readout_seeded_from_persisted_history(qtbot, tmp_path) -> None: 
     assert win2.result_label.property("dimmed") == "false"
 
 
-def test_variables_and_layouts_persist_across_restart(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_variables_and_csrs_persist_across_restart(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 
     from radix.history.store import HistoryStore
@@ -141,16 +141,16 @@ def test_variables_and_layouts_persist_across_restart(qtbot, tmp_path) -> None: 
 
     win1 = MainWindow(Session(), LIGHT, store=store)
     qtbot.addWidget(win1)
-    _submit(qtbot, win1, "layout CTRL = EN[31] ADDR[27:8]")
+    _submit(qtbot, win1, "csr CTRL = EN[31] ADDR[27:8]")
     _submit(qtbot, win1, "x = CTRL(0x8C01A0F3)")
     win1.close()
 
     win2 = MainWindow(Session(), LIGHT, store=store)
     qtbot.addWidget(win2)
-    assert set(win2.session.layouts) == {"CTRL"}
+    assert set(win2.session.csrs) == {"CTRL"}
     assert win2.session.variables["x"].number == 0x8C01A0F3
-    assert win2.session.variables["x"].layout is not None
-    assert win2.session.variables["x"].layout.name == "CTRL"
+    assert win2.session.variables["x"].csr is not None
+    assert win2.session.variables["x"].csr.name == "CTRL"
     assert win2.session.ans is not None
     assert win2.session.ans.number == 0x8C01A0F3
 
@@ -172,7 +172,7 @@ def test_clear_wipes_persisted_variables(qtbot, tmp_path) -> None:  # type: igno
     win2 = MainWindow(Session(), LIGHT, store=store)
     qtbot.addWidget(win2)
     assert win2.session.variables == {}
-    assert win2.session.layouts == {}
+    assert win2.session.csrs == {}
 
 
 def test_live_preview_shows_xor_and_result(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
@@ -1359,18 +1359,18 @@ def test_int_base_and_float_view_shortcuts_use_alt_shift(qtbot, window: MainWind
     assert "Alt+F" not in shortcuts
 
 
-def _define_ctrl_layout(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _submit(qtbot, window, "layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]")
+def _define_ctrl_csr(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _submit(qtbot, window, "csr CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]")
 
 
-def test_register_layout_shows_grid_overlay_matching_fields(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+def test_register_csr_shows_grid_overlay_matching_fields(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     from radix.ui_qt.bit_panel import FIELD_H
 
     grid = window.intview.grid_widget
-    no_layout_rows = grid._rows()
-    no_layout_min_h = grid.minimumHeight()
+    no_csr_rows = grid._rows()
+    no_csr_min_h = grid.minimumHeight()
 
-    _define_ctrl_layout(qtbot, window)
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
 
     assert grid.named_fields == (
@@ -1380,12 +1380,12 @@ def test_register_layout_shows_grid_overlay_matching_fields(qtbot, window: MainW
         ("CMD", 7, 0),
     )
     rows = grid._rows()
-    assert rows == no_layout_rows  # same word size -> same row count
-    assert grid.minimumHeight() == no_layout_min_h + rows * FIELD_H
+    assert rows == no_csr_rows  # same word size -> same row count
+    assert grid.minimumHeight() == no_csr_min_h + rows * FIELD_H
 
 
-def test_register_layout_field_table_visible_with_values(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_register_csr_field_table_visible_with_values(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
 
     assert window.intview.field_table.isVisibleTo(window)
@@ -1397,8 +1397,8 @@ def test_register_layout_field_table_visible_with_values(qtbot, window: MainWind
     assert "[31:31]" not in text
 
 
-def test_register_layout_field_table_updates_on_bit_toggle(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_register_csr_field_table_updates_on_bit_toggle(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
     assert "0xF3" in window.intview.field_table.text()
 
@@ -1407,8 +1407,8 @@ def test_register_layout_field_table_updates_on_bit_toggle(qtbot, window: MainWi
     assert "0xF3" not in window.intview.field_table.text()
 
 
-def test_register_layout_field_link_selects_range(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_register_csr_field_link_selects_range(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
 
     window.intview._on_field_link("CMD")
@@ -1416,23 +1416,23 @@ def test_register_layout_field_link_selects_range(qtbot, window: MainWindow) -> 
     assert window.intview.slice_label.text().startswith("[7:0]")
 
 
-def test_register_layout_survives_word_size_cycle(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_register_csr_survives_word_size_cycle(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
 
     window.session.cycle_word_size()  # 32 -> 64
     window._after_setting_change()
     assert window.intview.grid_widget.named_fields is not None  # overlay survives
 
-    window.session.cycle_word_size()  # 64 -> 8: clips the layout's top field (EN, bit 31)
+    window.session.cycle_word_size()  # 64 -> 8: clips the csr's top field (EN, bit 31)
     window._after_setting_change()
     assert window.intview.grid_widget.named_fields is not None  # overlay still not wiped
     assert window.intview.grid_widget._field_index_of(7) == 3  # CMD (top byte) still active
     assert "= -" in window.intview.field_table.text()  # EN reported as clipped
 
 
-def test_register_layout_cleared_by_plain_number(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_register_csr_cleared_by_plain_number(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
     assert window.intview.grid_widget.named_fields is not None
 
@@ -1441,22 +1441,22 @@ def test_register_layout_cleared_by_plain_number(qtbot, window: MainWindow) -> N
     assert not window.intview.field_table.isVisibleTo(window)
 
 
-def test_layout_command_toasts_and_refreshes_vars_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_csr_command_toasts_and_refreshes_vars_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     assert "CTRL" in window.toast_label.text()
     window._show_vars()
     texts = [window.vars_pane.item(i).text() for i in range(window.vars_pane.count())]
     assert any("CTRL" in t for t in texts)
 
 
-def test_bare_layout_command_shows_vars_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
-    _submit(qtbot, window, "layout")
+def test_bare_csr_command_shows_vars_pane(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
+    _submit(qtbot, window, "csr")
     assert window.vars_pane.isVisibleTo(window)
 
 
-def test_vars_pane_layout_row_click_inserts_call_paren(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
+def test_vars_pane_csr_row_click_inserts_call_paren(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
     window._show_vars()
     item = next(
         window.vars_pane.item(i)
@@ -1467,13 +1467,13 @@ def test_vars_pane_layout_row_click_inserts_call_paren(qtbot, window: MainWindow
     assert window.input.text() == "CTRL("
 
 
-def test_register_layout_cells_stay_clickable_and_draggable(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+def test_register_csr_cells_stay_clickable_and_draggable(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     # Named-fields mode is explicitly NOT read-only, unlike float mode: a
     # click still toggles bits and a drag still selects a range.
     from PySide6.QtCore import QEvent
     from PySide6.QtGui import QMouseEvent
 
-    _define_ctrl_layout(qtbot, window)
+    _define_ctrl_csr(qtbot, window)
     _submit(qtbot, window, "CTRL(0x8C01A0F3)")
     grid = window.intview.grid_widget
     grid.resize(600, 400)
@@ -1497,9 +1497,9 @@ def test_register_layout_cells_stay_clickable_and_draggable(qtbot, window: MainW
     assert window.intview.scratch == before ^ 1  # plain click still toggles
 
 
-def test_vars_pane_layout_row_right_click_deletes(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
-    _define_ctrl_layout(qtbot, window)
-    assert "CTRL" in window.session.layouts
+def test_vars_pane_csr_row_right_click_deletes(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
+    _define_ctrl_csr(qtbot, window)
+    assert "CTRL" in window.session.csrs
     window._show_vars()
     item = next(
         window.vars_pane.item(i)
@@ -1508,6 +1508,6 @@ def test_vars_pane_layout_row_right_click_deletes(qtbot, window: MainWindow) -> 
     )
     name = item.data(Qt.ItemDataRole.UserRole)
     assert name == "CTRL"
-    del window.session.layouts[name]
+    del window.session.csrs[name]
     window._refresh_vars_pane()
-    assert "CTRL" not in window.session.layouts
+    assert "CTRL" not in window.session.csrs

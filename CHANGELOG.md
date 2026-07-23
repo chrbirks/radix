@@ -22,9 +22,9 @@ ambiguity to resolve about major/minor/patch.
 
 ### Added
 
-- Variables, named `layout`s, and `ans` now persist across restarts in the
+- Variables, named `csr`s, and `ans` now persist across restarts in the
   same INI file as the other settings, saved after every assign/`del`/
-  `layout`/`clear` so a crash doesn't lose them. `clear` also wipes the
+  `csr`/`clear` so a crash doesn't lose them. `clear` also wipes the
   saved copy.
 - Bash/readline-style line editing in the input field: Ctrl+B/F move the
   cursor by one character, Alt+B/F by one word, Ctrl+E jumps to end of
@@ -35,14 +35,14 @@ ambiguity to resolve about major/minor/patch.
   32/64. Off by default — the panel greys instead, as it already did at
   word sizes 8/16 — since the float view is rarely needed and previously
   appeared on nearly every non-integer result. Persisted across restarts.
-- Register field layouts: `layout CTRL = EN[31] IRQ[30:28] ADDR[27:8]
+- CSR field layouts: `csr CTRL = EN[31] IRQ[30:28] ADDR[27:8]
   CMD[7:0]` names a reusable bit-field layout; `CTRL(value)` decodes any
-  integer against it, and `fields(value, EN[7] CMD[3:0])` does a one-shot
-  decode without naming a layout. The REGISTER bit grid draws colored
+  integer against it, and `csr(value, EN[7] CMD[3:0])` does a one-shot
+  decode without naming a csr. The REGISTER bit grid draws colored
   bracket-and-name bands over the fields live, with a field-value table
   below that updates as bits are toggled; click a field name to select its
   bit range. `ans.ADDR` (or `CTRL(x).ADDR`) reads a decoded field back out
-  as a plain integer. `vars`/`del`/`clear` all know about layouts alongside
+  as a plain integer. `vars`/`del`/`clear` all know about csrs alongside
   variables.
 
 ### Fixed

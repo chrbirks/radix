@@ -1,7 +1,7 @@
-"""Register field layouts: spec parsing, decoding, dot access, and rendering.
+"""CSR field layouts: spec parsing, decoding, dot access, and rendering.
 
 Drives the engine directly (parser/evaluator/render), since this task does not
-touch session.py — a later task wires layouts through Session.
+touch session.py — a later task wires csrs through Session.
 """
 
 from __future__ import annotations
@@ -9,9 +9,9 @@ from __future__ import annotations
 import pytest
 
 from radix.engine import evaluator, render
+from radix.engine.csr import csr_from_nodes, flatten_spec
 from radix.engine.errors import EvalError, IncompleteError, ParseError
 from radix.engine.functions import EvalContext
-from radix.engine.layouts import flatten_spec, layout_from_nodes
 from radix.engine.parser import parse
 from radix.engine.values import Value
 
@@ -25,49 +25,49 @@ def _ev(
     ctx: EvalContext | None = None,
     variables: dict[str, Value] | None = None,
     ans: Value | None = None,
-    layouts: dict[str, object] | None = None,
+    csrs: dict[str, object] | None = None,
 ) -> Value:
     node = parse(text)
-    return evaluator.evaluate(node, ctx or _ctx(), variables or {}, ans, layouts=layouts)
+    return evaluator.evaluate(node, ctx or _ctx(), variables or {}, ans, csrs=csrs)
 
 
-# -- fields(...) macro: decoding -------------------------------------------------
+# -- csr(...) macro: decoding -------------------------------------------------
 
 
-def test_fields_macro_decodes_and_builds_note() -> None:
-    v = _ev("fields(0x8C01A0F3, EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0])")
+def test_csr_macro_decodes_and_builds_note() -> None:
+    v = _ev("csr(0x8C01A0F3, EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0])")
     assert v.number == 0x8C01A0F3
     assert v.note == "EN=1 IRQ=0b000 ADDR=0xC01A0 CMD=0xF3"
-    assert v.layout is not None
-    assert v.layout.name is None
-    assert [f.name for f in v.layout.fields] == ["EN", "IRQ", "ADDR", "CMD"]
+    assert v.csr is not None
+    assert v.csr.name is None
+    assert [f.name for f in v.csr.fields] == ["EN", "IRQ", "ADDR", "CMD"]
 
 
-def test_comma_and_space_separators_produce_identical_layouts() -> None:
-    space = _ev("fields(0xF3, HI[7:4] LO[3:0])")
-    comma = _ev("fields(0xF3, HI[7:4], LO[3:0])")
+def test_comma_and_space_separators_produce_identical_csrs() -> None:
+    space = _ev("csr(0xF3, HI[7:4] LO[3:0])")
+    comma = _ev("csr(0xF3, HI[7:4], LO[3:0])")
     assert space.note == comma.note == "HI=0b1111 LO=0b0011"
-    assert space.layout is not None and comma.layout is not None
-    assert [f.name for f in space.layout.fields] == [f.name for f in comma.layout.fields]
+    assert space.csr is not None and comma.csr is not None
+    assert [f.name for f in space.csr.fields] == [f.name for f in comma.csr.fields]
 
 
 def test_negative_value_is_masked_before_extraction() -> None:
-    v = _ev("fields(-1, A[3:0])", ctx=_ctx(word_size=32))
+    v = _ev("csr(-1, A[3:0])", ctx=_ctx(word_size=32))
     assert v.note == "A=0b1111"
     assert v.number == -1  # unmasked original number is preserved
 
 
 def test_word_size_violation_names_the_offending_field() -> None:
     with pytest.raises(EvalError) as exc:
-        _ev("fields(0, A[8])", ctx=_ctx(word_size=8))
+        _ev("csr(0, A[8])", ctx=_ctx(word_size=8))
     assert str(exc.value) == "field A[8] is outside the 8-bit word"
 
 
-# -- fields(...) macro: errors ----------------------------------------------------
+# -- csr(...) macro: errors ----------------------------------------------------
 
 
 def test_non_literal_lsb_errors_with_span_on_offending_node() -> None:
-    text = "fields(1, A[x])"
+    text = "csr(1, A[x])"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert "field ranges must be literal integers" in str(exc.value)
@@ -77,7 +77,7 @@ def test_non_literal_lsb_errors_with_span_on_offending_node() -> None:
 
 
 def test_non_literal_lsb_expression_errors() -> None:
-    text = "fields(1, A[1+2])"
+    text = "csr(1, A[1+2])"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert "field ranges must be literal integers" in str(exc.value)
@@ -87,7 +87,7 @@ def test_non_literal_lsb_expression_errors() -> None:
 
 
 def test_msb_less_than_lsb_errors() -> None:
-    text = "fields(1, A[3:5])"
+    text = "csr(1, A[3:5])"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert str(exc.value) == "invalid field range [3:5] — msb must be >= lsb"
@@ -97,7 +97,7 @@ def test_msb_less_than_lsb_errors() -> None:
 
 
 def test_duplicate_field_name_errors_on_second_occurrence() -> None:
-    text = "fields(1, A[3:0] A[7:4])"
+    text = "csr(1, A[3:0] A[7:4])"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert str(exc.value) == "duplicate field name 'A'"
@@ -107,7 +107,7 @@ def test_duplicate_field_name_errors_on_second_occurrence() -> None:
 
 
 def test_overlapping_ranges_error_names_both_fields() -> None:
-    text = "fields(1, ADDR[27:8] CMD[9:0])"
+    text = "csr(1, ADDR[27:8] CMD[9:0])"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert str(exc.value) == "field CMD[9:0] overlaps ADDR[27:8]"
@@ -117,7 +117,7 @@ def test_overlapping_ranges_error_names_both_fields() -> None:
 
 
 def test_non_slice_leaf_errors() -> None:
-    text = "fields(1, 2)"
+    text = "csr(1, 2)"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert "field ranges must be literal integers" in str(exc.value)
@@ -126,17 +126,17 @@ def test_non_slice_leaf_errors() -> None:
     assert exc.value.span.end == start + 1
 
 
-def test_fields_arity_below_two_errors() -> None:
-    text = "fields(1)"
+def test_csr_arity_below_two_errors() -> None:
+    text = "csr(1)"
     with pytest.raises(EvalError) as exc:
         _ev(text)
-    assert "fields takes a value and at least one field" in str(exc.value)
+    assert "csr takes a value and at least one field" in str(exc.value)
     assert exc.value.span.start == 0
     assert exc.value.span.end == len(text)
 
 
 def test_float_decode_target_errors() -> None:
-    text = "fields(1.5, A[3:0])"
+    text = "csr(1.5, A[3:0])"
     with pytest.raises(EvalError) as exc:
         _ev(text)
     assert "field decode requires an integer operand" in str(exc.value)
@@ -145,30 +145,30 @@ def test_float_decode_target_errors() -> None:
     assert exc.value.span.end == start + len("1.5")
 
 
-# -- layout-name calls (hand-built layouts dict, no session.py involved) --------
+# -- csr-name calls (hand-built csrs dict, no session.py involved) --------------
 
 
-def test_layout_name_call_decodes_with_layout_attached() -> None:
+def test_csr_name_call_decodes_with_csr_attached() -> None:
     spec = parse("EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]")
-    layout = layout_from_nodes(flatten_spec(spec), name="CTRL")
-    v = _ev("CTRL(0x8C01A0F3)", layouts={"CTRL": layout})
+    csr = csr_from_nodes(flatten_spec(spec), name="CTRL")
+    v = _ev("CTRL(0x8C01A0F3)", csrs={"CTRL": csr})
     assert v.number == 0x8C01A0F3
-    assert v.layout is not None and v.layout.name == "CTRL"
+    assert v.csr is not None and v.csr.name == "CTRL"
     assert v.note == "EN=1 IRQ=0b000 ADDR=0xC01A0 CMD=0xF3"
 
 
-def test_layout_name_call_arity_error() -> None:
+def test_csr_name_call_arity_error() -> None:
     spec = parse("EN[31]")
-    layout = layout_from_nodes(flatten_spec(spec), name="CTRL")
+    csr = csr_from_nodes(flatten_spec(spec), name="CTRL")
     with pytest.raises(EvalError) as exc:
-        _ev("CTRL(1, 2)", layouts={"CTRL": layout})
+        _ev("CTRL(1, 2)", csrs={"CTRL": csr})
     assert str(exc.value) == "CTRL takes 1 argument(s), got 2"
 
 
-def test_fields_macro_dispatches_before_functions_stub() -> None:
-    # "fields" is registered in FUNCTIONS purely for help/autocomplete; calling it
+def test_csr_macro_dispatches_before_functions_stub() -> None:
+    # "csr" is registered in FUNCTIONS purely for help/autocomplete; calling it
     # must never reach that stub's AssertionError.
-    v = _ev("fields(1, A[0])")
+    v = _ev("csr(1, A[0])")
     assert v.note == "A=1"
 
 
@@ -176,36 +176,36 @@ def test_fields_macro_dispatches_before_functions_stub() -> None:
 
 
 def test_dot_access_extracts_plain_int_with_declared_width() -> None:
-    v = _ev("fields(0xF3, HI[7:4] LO[3:0]).HI")
+    v = _ev("csr(0xF3, HI[7:4] LO[3:0]).HI")
     assert v.number == 15
     assert v.declared_width == 4
-    assert v.layout is None  # extracting a field yields a plain int, not another layout
+    assert v.csr is None  # extracting a field yields a plain int, not another csr
 
 
 def test_dot_access_chains_with_shift() -> None:
-    v = _ev("fields(0xF3, HI[7:4] LO[3:0]).HI << 2")
+    v = _ev("csr(0xF3, HI[7:4] LO[3:0]).HI << 2")
     assert v.number == 60
 
 
 def test_dot_access_result_can_be_sliced() -> None:
-    v = _ev("fields(0xF3, HI[7:4] LO[3:0]).HI[1:0]")
+    v = _ev("csr(0xF3, HI[7:4] LO[3:0]).HI[1:0]")
     assert v.number == 0b11
 
 
-def test_dot_access_on_layout_less_value_errors() -> None:
+def test_dot_access_on_csr_less_value_errors() -> None:
     text = "ans.ADDR"
     with pytest.raises(EvalError) as exc:
         _ev(text, ans=Value(5))
-    assert "no field layout on this value" in str(exc.value)
+    assert "no field csr on this value" in str(exc.value)
     assert exc.value.span.start == text.index("ans")
     assert exc.value.span.end == text.index("ans") + len("ans")
 
 
 def test_unknown_field_name_lists_actual_fields() -> None:
-    text = "fields(0xF3, HI[7:4] LO[3:0]).FOO"
+    text = "csr(0xF3, HI[7:4] LO[3:0]).FOO"
     with pytest.raises(EvalError) as exc:
         _ev(text)
-    assert str(exc.value) == "no field 'FOO' — this layout has HI, LO"
+    assert str(exc.value) == "no field 'FOO' — this csr has HI, LO"
     start = text.rindex("FOO")
     assert exc.value.span.start == start
     assert exc.value.span.end == start + len("FOO")
@@ -232,23 +232,23 @@ def test_dot_before_digit_is_still_a_decimal_literal_golden_case() -> None:
     assert dotted.number == explicit.number == 5
 
 
-# -- render: spec-preserving fields(...) and dot access --------------------------
+# -- render: spec-preserving csr(...) and dot access --------------------------
 
 
-def test_render_fields_space_form_has_no_multiplication_sign() -> None:
-    node = parse("fields(165, EN[31] IRQ[30:28])")
+def test_render_csr_space_form_has_no_multiplication_sign() -> None:
+    node = parse("csr(165, EN[31] IRQ[30:28])")
     text = render.render(node, {}, None)
-    assert text == "fields(165, EN[31] IRQ[30:28])"
+    assert text == "csr(165, EN[31] IRQ[30:28])"
     assert "×" not in text
 
 
-def test_render_fields_comma_form_round_trips_separator_style() -> None:
-    node = parse("fields(165, EN[31], IRQ[30:28])")
+def test_render_csr_comma_form_round_trips_separator_style() -> None:
+    node = parse("csr(165, EN[31], IRQ[30:28])")
     text = render.render(node, {}, None)
-    assert text == "fields(165, EN[31], IRQ[30:28])"
+    assert text == "csr(165, EN[31], IRQ[30:28])"
 
 
-def test_render_layout_name_call_is_an_ordinary_call() -> None:
+def test_render_csr_name_call_is_an_ordinary_call() -> None:
     node = parse("CTRL(4)")
     text = render.render(node, {}, None)
     assert text == "CTRL(4)"

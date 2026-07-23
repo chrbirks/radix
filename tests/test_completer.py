@@ -8,29 +8,29 @@ from radix.ui_qt.highlight import color_for
 from radix.ui_qt.theme import DARK, LIGHT
 
 
-def test_layout_completion_appears() -> None:
+def test_csr_completion_appears() -> None:
     session = Session()
-    session.evaluate("layout CTRL = EN[31] IRQ[30:28]", commit=True)
+    session.evaluate("csr CTRL = EN[31] IRQ[30:28]", commit=True)
     items = completions(session)
     ctrl_completion = next((c for c in items if c.name == "CTRL"), None)
     assert ctrl_completion is not None
-    assert ctrl_completion.kind == "layout"
+    assert ctrl_completion.kind == "csr"
     assert ctrl_completion.insert == "CTRL("
     assert "EN[31]" in ctrl_completion.summary
 
 
-def test_fields_function_completion() -> None:
+def test_csr_function_completion() -> None:
     items = completions(Session())
-    fields_completion = next((c for c in items if c.name == "fields"), None)
-    assert fields_completion is not None
-    assert fields_completion.kind == "function"
+    csr_completion = next((c for c in items if c.name == "csr"), None)
+    assert csr_completion is not None
+    assert csr_completion.kind == "function"
 
 
-def test_color_for_layout_light_palette() -> None:
-    color = color_for("layout", LIGHT)
+def test_color_for_csr_light_palette() -> None:
+    color = color_for("csr", LIGHT)
     assert color is not None
 
 
-def test_color_for_layout_dark_palette() -> None:
-    color = color_for("layout", DARK)
+def test_color_for_csr_dark_palette() -> None:
+    color = color_for("csr", DARK)
     assert color is not None

@@ -74,8 +74,8 @@ directory (no logout needed).
 > x = 8'hA5                Verilog/VHDL literals: 8'hFF, 12'b1010_1010, x"FF"
 > x[7:4]                   bit slicing and testing: x[3]
   10
-> layout CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]
-                           name a register field layout; CTRL(v) decodes v
+> csr CTRL = EN[31] IRQ[30:28] ADDR[27:8] CMD[7:0]
+                           name a CSR field layout; CTRL(v) decodes v
 > CTRL(0x8C01_A0F3)        REGISTER grid shows the named field bands live
   0x8C01A0F3   EN=1 IRQ=0b000 ADDR=0xC01A0 CMD=0xF3
 > 2**10 + 0b1010           ** = power, ^ = XOR — in every context
@@ -138,7 +138,7 @@ as hex/dec/bin, recall it, or delete it.
 All settings — word size, signedness, deg/rad, notation, result base,
 always-on-top, window geometry — persist across restarts in a plain INI file
 (`%APPDATA%\radix` on Windows, `~/.config/radix` on Linux). Variables, named
-`layout`s, and `ans` persist there too, and are restored on the next launch.
+`csr`s, and `ans` persist there too, and are restored on the next launch.
 
 ## Keyboard
 
@@ -159,7 +159,7 @@ always-on-top, window geometry — persist across restarts in a plain INI file
 | Alt+M            | cycle theme: auto (follows the OS) / light / dark      |
 | Esc              | dismiss help/variables pane, clear bit-range selection |
 
-`clear` wipes variables, layouts, and persistent history. History is stored
+`clear` wipes variables, csrs, and persistent history. History is stored
 as JSONL in the platform user-data directory and recalled entries
 re-evaluate through the live engine.
 

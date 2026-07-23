@@ -343,10 +343,10 @@ class MainWindow(QMainWindow):
             if self.store is not None:
                 save_state(self.session)
             return
-        if outcome.kind == "layout":
+        if outcome.kind == "csr":
             self.input.clear()
             if outcome.target is not None:
-                self._toast(outcome.help_text or f"defined layout {outcome.target}")
+                self._toast(outcome.help_text or f"defined csr {outcome.target}")
                 self._refresh_vars_pane()
                 if self.store is not None:
                     save_state(self.session)
@@ -434,11 +434,11 @@ class MainWindow(QMainWindow):
         if outcome.kind == "del":
             self._set_preview(f"press Enter to delete {outcome.target}", error=False)
             return
-        if outcome.kind == "layout":
+        if outcome.kind == "csr":
             if outcome.target is not None:
-                self._set_preview(f"press Enter to define layout {outcome.target}", error=False)
+                self._set_preview(f"press Enter to define csr {outcome.target}", error=False)
             else:
-                self._set_preview("press Enter to list layouts", error=False)
+                self._set_preview("press Enter to list csrs", error=False)
             return
         if outcome.kind == "clear":
             self._set_preview("press Enter to clear variables and history", error=False)
@@ -465,7 +465,7 @@ class MainWindow(QMainWindow):
         if isinstance(number, int):
             assert value is not None
             self.intview.show_value(
-                number, self.session.word_size, self.session.signed, layout=value.layout
+                number, self.session.word_size, self.session.signed, csr=value.csr
             )
             return
         float_views = (
@@ -716,7 +716,7 @@ class MainWindow(QMainWindow):
             self.intview.scratch if self.intview.active else None,
             self.session.word_size,
             self.session.signed,
-            layout=self.intview.reg_layout,
+            csr=self.intview.csr,
         )
         self._update_preview()
 
@@ -790,7 +790,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_vars_pane(self) -> None:
         self.vars_pane.clear()
-        if not self.session.variables and not self.session.layouts:
+        if not self.session.variables and not self.session.csrs:
             placeholder = QListWidgetItem("no variables -- assign with  x = 42")
             placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
             self.vars_pane.addItem(placeholder)
@@ -800,8 +800,8 @@ class MainWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, name)
             item.setToolTip("click to insert; right-click or `del <name>` to remove")
             self.vars_pane.addItem(item)
-        for name, lyt in self.session.layouts.items():
-            item = QListWidgetItem(f"{name} = layout {lyt.spec_text()}")
+        for name, c in self.session.csrs.items():
+            item = QListWidgetItem(f"{name} = csr {c.spec_text()}")
             item.setData(Qt.ItemDataRole.UserRole, name)
             item.setToolTip("click to insert a call; right-click or `del <name>` to remove")
             self.vars_pane.addItem(item)
@@ -810,7 +810,7 @@ class MainWindow(QMainWindow):
         name = item.data(Qt.ItemDataRole.UserRole)
         if not name:
             return
-        text = f"{name}(" if name in self.session.layouts else name
+        text = f"{name}(" if name in self.session.csrs else name
         self.completer.suppress_next()
         self.input.insertPlainText(text)
         self.input.setFocus()
@@ -826,7 +826,7 @@ class MainWindow(QMainWindow):
             if name in self.session.variables:
                 del self.session.variables[name]
             else:
-                del self.session.layouts[name]
+                del self.session.csrs[name]
             self._refresh_vars_pane()
             self._toast(f"deleted {name}")
 

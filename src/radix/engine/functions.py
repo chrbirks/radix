@@ -178,14 +178,14 @@ _register("ceil", (1, 1), "x", _ROUND, "Round up to an integer.", "ceil(2.1)", _
 _register("round", (1, 1), "x", _ROUND, "Round to the nearest integer.", "round(2.5)", _round)
 
 
-def _fields_stub(args: list[Number], ctx: EvalContext) -> Number:
-    raise AssertionError("fields() is macro-dispatched in the evaluator")  # pragma: no cover
+def _csr_stub(args: list[Number], ctx: EvalContext) -> Number:
+    raise AssertionError("csr() is macro-dispatched in the evaluator")  # pragma: no cover
 
 
 _register(
-    "fields", (2, 2), "value, NAME[msb:lsb] ...", _REG,
+    "csr", (2, 2), "value, NAME[msb:lsb] ...", _REG,
     "Decode value into named bit-fields; draws them on the REGISTER grid.",
-    "fields(0xF3, MODE[7:4] CMD[3:0])", _fields_stub,
+    "csr(0xF3, MODE[7:4] CMD[3:0])", _csr_stub,
 )
 
 CONSTANTS: dict[str, tuple[Number, str]] = {

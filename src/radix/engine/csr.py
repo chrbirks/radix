@@ -1,4 +1,4 @@
-"""Register field layouts: structural spec interpretation and decoding."""
+"""CSR field layouts: structural spec interpretation and decoding."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from radix.engine.nodes import Binary, Literal, Name, Node, Slice
 
 
 @dataclass(frozen=True)
-class RegField:
+class CsrField:
     name: str
     msb: int
     lsb: int  # msb == lsb for single-bit fields
@@ -21,9 +21,9 @@ class RegField:
 
 
 @dataclass(frozen=True)
-class RegLayout:
-    name: str | None  # None for one-shot fields(...)
-    fields: tuple[RegField, ...]  # stored msb-descending
+class Csr:
+    name: str | None  # None for one-shot csr(...)
+    fields: tuple[CsrField, ...]  # stored msb-descending
 
     @property
     def top_bit(self) -> int:
@@ -32,7 +32,7 @@ class RegLayout:
     def spec_text(self) -> str:
         return " ".join(_field_repr(f.name, f.msb, f.lsb) for f in self.fields)
 
-    def field(self, name: str) -> RegField | None:
+    def field(self, name: str) -> CsrField | None:
         for f in self.fields:
             if f.name == name:
                 return f
@@ -46,10 +46,10 @@ def flatten_spec(node: Node) -> list[Node]:
     return [node]
 
 
-def layout_from_nodes(nodes: list[Node], name: str | None) -> RegLayout:
-    """Validate leaves and build a RegLayout. Raises EvalError with precise spans."""
+def csr_from_nodes(nodes: list[Node], name: str | None) -> Csr:
+    """Validate leaves and build a Csr. Raises EvalError with precise spans."""
     seen: dict[str, Span] = {}
-    built: list[RegField] = []
+    built: list[CsrField] = []
     for leaf in nodes:
         if not isinstance(leaf, Slice) or not isinstance(leaf.operand, Name):
             raise EvalError(
@@ -84,28 +84,28 @@ def layout_from_nodes(nodes: list[Node], name: str | None) -> RegLayout:
                     leaf.span,
                 )
         seen[field_name] = leaf.operand.span
-        built.append(RegField(field_name, msb, lsb))
+        built.append(CsrField(field_name, msb, lsb))
     ordered = tuple(sorted(built, key=lambda f: -f.msb))
-    return RegLayout(name, ordered)
+    return Csr(name, ordered)
 
 
-def layout_to_json(layout: RegLayout) -> dict[str, Any]:
-    """JSON-safe representation of a layout, for session persistence."""
+def csr_to_json(csr: Csr) -> dict[str, Any]:
+    """JSON-safe representation of a csr, for session persistence."""
     return {
-        "name": layout.name,
-        "fields": [{"name": f.name, "msb": f.msb, "lsb": f.lsb} for f in layout.fields],
+        "name": csr.name,
+        "fields": [{"name": f.name, "msb": f.msb, "lsb": f.lsb} for f in csr.fields],
     }
 
 
-def layout_from_json(data: dict[str, Any]) -> RegLayout:
-    """Inverse of ``layout_to_json``. Raises on malformed data."""
+def csr_from_json(data: dict[str, Any]) -> Csr:
+    """Inverse of ``csr_to_json``. Raises on malformed data."""
     fields = tuple(
-        RegField(f["name"], f["msb"], f["lsb"]) for f in data["fields"]
+        CsrField(f["name"], f["msb"], f["lsb"]) for f in data["fields"]
     )
-    return RegLayout(data["name"], fields)
+    return Csr(data["name"], fields)
 
 
-def format_field_value(field: RegField, value: int) -> str:
+def format_field_value(field: CsrField, value: int) -> str:
     """'1' / '0b101' / '0xC01A0' — the one formatting rule for a field's value."""
     if field.width == 1:
         return str(value)
@@ -115,13 +115,13 @@ def format_field_value(field: RegField, value: int) -> str:
     return f"0x{value:0{hex_digits}X}"
 
 
-def decode_note(layout: RegLayout, raw: int) -> str:
+def decode_note(csr: Csr, raw: int) -> str:
     """'EN=1 IRQ=0b000 ADDR=0xC01A0 CMD=0xF3' — formatting rules below."""
-    parts = [f"{f.name}={format_field_value(f, extract(layout, f, raw))}" for f in layout.fields]
+    parts = [f"{f.name}={format_field_value(f, extract(csr, f, raw))}" for f in csr.fields]
     return " ".join(parts)
 
 
-def extract(layout: RegLayout, field: RegField, raw: int) -> int:
+def extract(csr: Csr, field: CsrField, raw: int) -> int:
     return (raw >> field.lsb) & ((1 << field.width) - 1)
 
 

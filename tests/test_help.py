@@ -40,17 +40,13 @@ def test_every_function_declares_params_and_category() -> None:
         assert n_params == spec.arity[1], spec.name  # names match max arity
 
 
-def test_topic_help_fields_signature() -> None:
-    fields_help = topic_help("fields")
-    assert fields_help is not None
-    assert fields_help.startswith("fields(")
+def test_topic_help_csr() -> None:
+    csr_help = topic_help("csr")
+    assert csr_help is not None
+    assert csr_help.startswith("csr NAME = FIELD[msb:lsb]")
+    assert "csr(x, EN[7] CMD[3:0])" in csr_help  # one-shot form documented inline
 
 
-def test_topic_help_layout() -> None:
-    layout_help = topic_help("layout")
-    assert layout_help is not None
-
-
-def test_general_help_contains_layout() -> None:
+def test_general_help_contains_csr() -> None:
     text = general_help()
-    assert "layout" in text
+    assert "csr" in text

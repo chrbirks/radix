@@ -19,6 +19,7 @@ from collections.abc import Mapping
 
 import mpmath
 
+from radix.engine.csr import Csr, csr_from_nodes, decode_note, extract, flatten_spec
 from radix.engine.errors import EvalError, Span
 from radix.engine.functions import (
     CONSTANTS,
@@ -26,7 +27,6 @@ from radix.engine.functions import (
     EvalContext,
     FunctionDomainError,
 )
-from radix.engine.layouts import RegLayout, decode_note, extract, flatten_spec, layout_from_nodes
 from radix.engine.nodes import (
     Assign,
     Binary,
@@ -53,10 +53,10 @@ def evaluate(
     ctx: EvalContext,
     variables: Mapping[str, Value],
     ans: Value | None,
-    layouts: Mapping[str, RegLayout] | None = None,
+    csrs: Mapping[str, Csr] | None = None,
 ) -> Value:
     """Evaluate an expression AST (not Assign — the session handles those)."""
-    ev = _Evaluator(ctx, variables, ans, layouts)
+    ev = _Evaluator(ctx, variables, ans, csrs)
     return ev.eval(node)
 
 
@@ -66,12 +66,12 @@ class _Evaluator:
         ctx: EvalContext,
         variables: Mapping[str, Value],
         ans: Value | None,
-        layouts: Mapping[str, RegLayout] | None = None,
+        csrs: Mapping[str, Csr] | None = None,
     ) -> None:
         self.ctx = ctx
         self.variables = variables
         self.ans = ans
-        self.layouts = layouts
+        self.csrs = csrs
 
     @property
     def _mask(self) -> int:
@@ -219,8 +219,8 @@ class _Evaluator:
     # -- calls and slices ------------------------------------------------------
 
     def _call(self, node: Call) -> Value:
-        if node.func == "fields":
-            return self._fields_macro(node)
+        if node.func == "csr":
+            return self._csr_macro(node)
         spec = FUNCTIONS.get(node.func)
         if spec is not None:
             lo, hi = spec.arity
@@ -235,58 +235,58 @@ class _Evaluator:
             except FunctionDomainError as exc:
                 raise EvalError(str(exc), node.span) from exc
             return result if isinstance(result, Value) else Value(result)
-        if self.layouts and node.func in self.layouts:
-            return self._layout_call(node)
+        if self.csrs and node.func in self.csrs:
+            return self._csr_call(node)
         raise EvalError(f"unknown function {node.func!r}", node.func_span)
 
-    def _fields_macro(self, node: Call) -> Value:
+    def _csr_macro(self, node: Call) -> Value:
         if len(node.args) < 2:
             raise EvalError(
-                "fields takes a value and at least one field, e.g. fields(x, EN[7] CMD[3:0])",
+                "csr takes a value and at least one field, e.g. csr(x, EN[7] CMD[3:0])",
                 node.span,
             )
         value = self._require_int(self.eval(node.args[0]), node.args[0].span, "field decode")
         leaves: list[Node] = []
         for arg in node.args[1:]:
             leaves += flatten_spec(arg)
-        layout = layout_from_nodes(leaves, name=None)
-        return self._decode(layout, value, node.span)
+        csr = csr_from_nodes(leaves, name=None)
+        return self._decode(csr, value, node.span)
 
-    def _layout_call(self, node: Call) -> Value:
-        assert self.layouts is not None
-        layout = self.layouts[node.func]
+    def _csr_call(self, node: Call) -> Value:
+        assert self.csrs is not None
+        csr = self.csrs[node.func]
         if len(node.args) != 1:
             raise EvalError(
                 f"{node.func} takes 1 argument(s), got {len(node.args)}", node.span
             )
         value = self._require_int(self.eval(node.args[0]), node.args[0].span, "field decode")
-        return self._decode(layout, value, node.span)
+        return self._decode(csr, value, node.span)
 
-    def _decode(self, layout: RegLayout, value: int, span: Span) -> Value:
-        if layout.top_bit >= self.ctx.word_size:
-            field = next((f for f in layout.fields if f.msb == layout.top_bit), layout.fields[0])
+    def _decode(self, csr: Csr, value: int, span: Span) -> Value:
+        if csr.top_bit >= self.ctx.word_size:
+            field = next((f for f in csr.fields if f.msb == csr.top_bit), csr.fields[0])
             raise EvalError(
                 f"field {field.name}[{field.msb}] is outside the {self.ctx.word_size}-bit word",
                 span,
             )
         raw = value & self._mask
-        return Value(value, layout=layout, note=decode_note(layout, raw))
+        return Value(value, csr=csr, note=decode_note(csr, raw))
 
     def _field(self, node: Field) -> Value:
         operand = self.eval(node.operand)
-        if operand.layout is None:
+        if operand.csr is None:
             raise EvalError(
-                "no field layout on this value — decode with a layout call "
-                "or fields(...) first",
+                "no field csr on this value — decode with a csr call "
+                "or csr(...) first",
                 node.operand.span,
             )
-        f = operand.layout.field(node.name)
+        f = operand.csr.field(node.name)
         if f is None:
-            layout_desc = operand.layout.name or "this layout"
-            names = ", ".join(fld.name for fld in operand.layout.fields)
-            raise EvalError(f"no field {node.name!r} — {layout_desc} has {names}", node.name_span)
+            csr_desc = operand.csr.name or "this csr"
+            names = ", ".join(fld.name for fld in operand.csr.fields)
+            raise EvalError(f"no field {node.name!r} — {csr_desc} has {names}", node.name_span)
         raw = self._require_int(operand, node.operand.span, "field access") & self._mask
-        return Value(extract(operand.layout, f, raw), declared_width=f.width)
+        return Value(extract(operand.csr, f, raw), declared_width=f.width)
 
     def _slice(self, node: Slice) -> Value:
         value = self._require_int(self.eval(node.operand), node.operand.span, "bit slice")
