@@ -9,6 +9,8 @@ ambiguity to resolve about major/minor/patch.
 
 ## [Unreleased]
 
+## [6] - 2026-07-23
+
 ### Changed
 
 - The history panel is redesigned as a grouped ledger: the input line now
