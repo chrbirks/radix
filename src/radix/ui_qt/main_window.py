@@ -105,6 +105,16 @@ class MainWindow(QMainWindow):
         self.history_view.clicked.connect(self._inspect_from_view)
         self.history_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.history_view.customContextMenuRequested.connect(self._history_context_menu)
+        # Tracks whether the view is "following" the latest entry, so a
+        # window-manager-driven resize (see eventFilter) knows whether to
+        # re-pin to the bottom afterwards or leave a manually-scrolled-up
+        # view alone. Driven by valueChanged (fires only on a real value
+        # change) rather than sampled at resize time, since ResizeMode.Adjust
+        # can deliver Resize events with a transient, not-yet-settled range.
+        self._history_follow_bottom = True
+        self.history_view.verticalScrollBar().valueChanged.connect(
+            self._on_history_scroll_changed
+        )
         # Row width comes from the viewport at layout time (the delegate
         # draws unwrapped text straight into option.rect, never measuring
         # content) — Fixed (Qt's default) only lays that out once, so a
@@ -151,6 +161,13 @@ class MainWindow(QMainWindow):
         self.input.submitted.connect(self._evaluate)
         self.input.textChanged.connect(self._schedule_preview)
         self.input.installEventFilter(self)
+        # The window manager can still resize the history view after our
+        # initial scrollToBottom() (showEvent) — e.g. Wayland settling final
+        # geometry a beat after the window is mapped — which otherwise
+        # leaves the scrollbar frozen one row short of the new bottom.
+        # Re-pin only if we were already at the bottom pre-resize, so a
+        # resize while reviewing older entries doesn't yank the view down.
+        self.history_view.installEventFilter(self)
         self.highlighter = ExprHighlighter(self.input.document(), palette)
         self.completer = Completer(self.input, session, palette)
 
@@ -487,9 +504,21 @@ class MainWindow(QMainWindow):
         self.highlighter.set_error_span((exc.span.start, exc.span.end))
         self._set_preview(exc.message, error=True)
 
+    def _on_history_scroll_changed(self, value: int) -> None:
+        self._history_follow_bottom = value >= self.history_view.verticalScrollBar().maximum()
+
+    def _resync_history_scroll(self) -> None:
+        # Re-checked here rather than at schedule time: a resize's layout
+        # settles on the next event-loop tick, and by then the user may
+        # already have scrolled away from the bottom.
+        if self._history_follow_bottom:
+            self.history_view.scrollToBottom()
+
     # -- history recall ---------------------------------------------------------
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if obj is self.history_view and event.type() == QEvent.Type.Resize:
+            QTimer.singleShot(0, self._resync_history_scroll)
         if obj is self.input and event.type() == QEvent.Type.FocusOut:
             self.completer.hide()
         if obj is self.input and event.type() == QEvent.Type.KeyPress:

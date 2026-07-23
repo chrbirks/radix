@@ -519,6 +519,59 @@ def test_history_scrolls_to_bottom_on_first_show(qtbot, tmp_path) -> None:  # ty
     assert scrollbar.value() == scrollbar.maximum()
 
 
+def test_history_stays_pinned_to_bottom_after_late_resize(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+    for i in range(40):
+        store.append(f"{i} + 1", str(i + 1), "", value=i + 1)
+
+    win = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    scrollbar = win.history_view.verticalScrollBar()
+    assert scrollbar.value() == scrollbar.maximum()
+
+    # A window manager can resize the view again after our initial
+    # scrollToBottom() (e.g. Wayland settling final geometry a beat after
+    # the window is mapped), which used to leave the scrollbar frozen one
+    # row short of the new bottom.
+    win.resize(win.width(), win.height() - 80)
+    qtbot.waitUntil(lambda: scrollbar.value() == scrollbar.maximum(), timeout=1000)
+
+
+def test_history_resize_does_not_yank_scrolled_up_view(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+    from PySide6.QtWidgets import QAbstractItemView
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+    for i in range(40):
+        store.append(f"{i} + 1", str(i + 1), "", value=i + 1)
+
+    win = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    scrollbar = win.history_view.verticalScrollBar()
+    # Go through the view's own scrollTo (as a real click/wheel/keyboard
+    # scroll would), not a bare scrollbar.setValue() — the latter bypasses
+    # QAbstractItemView's internal position bookkeeping and its own next
+    # layout pass snaps back to the bottom regardless of our fix.
+    win.history_view.scrollTo(win.model.index(0), QAbstractItemView.ScrollHint.PositionAtTop)
+    assert scrollbar.value() == 0
+
+    win.resize(win.width(), win.height() - 80)
+    qtbot.wait(200)
+    assert scrollbar.value() == 0
+
+
 def test_history_no_horizontal_scrollbar_after_resize(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
     from PySide6.QtCore import QSettings
 

@@ -47,6 +47,12 @@ ambiguity to resolve about major/minor/patch.
 
 ### Fixed
 
+- The history panel no longer scrolled all the way to the bottom on
+  startup with a large persisted history: the window manager can resize
+  the view again a beat after the initial `scrollToBottom()` (e.g. Wayland
+  settling final geometry after the window is mapped), leaving the
+  scrollbar frozen one row short. The view now re-pins to the bottom after
+  any resize if it was already there beforehand.
 - PINNED's mini bit strips drew adjacent "set" bits edge-to-edge within a
   nibble, so consecutive 1s visually merged into one solid block instead of
   reading as distinct bits. Added a small gap between every cell (on top of
