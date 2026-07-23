@@ -1,8 +1,9 @@
-"""History list: model + delegate rendering it as a ledger.
+"""History list: model + delegate rendering it as a grouped ledger.
 
-Two lines per entry (three with a note): a muted syntax-colored
-`> expression`, then the result. An assignment paints a rounded chip with
-the variable name instead of the `x ← ` prefix text.
+Two lines per entry (three with a note): a muted `expression`, then an
+accent `= ` leader followed by the result. An assignment paints a rounded
+chip with the variable name instead of the `x ← ` prefix text. A hairline
+divider separates entries.
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from radix.engine.values import Value
-from radix.ui_qt.highlight import classify, color_for
 from radix.ui_qt.theme import Palette
 
 EXPRESSION_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -31,9 +31,11 @@ RESULT_ROLE = Qt.ItemDataRole.UserRole + 2
 NOTE_ROLE = Qt.ItemDataRole.UserRole + 3
 PREFIX_ROLE = Qt.ItemDataRole.UserRole + 4
 
-ROW_PAD_H = 8
-ROW_PAD_V = 4
-LINE_GAP = 2
+ROW_PAD_H = 10
+ROW_PAD_TOP = 8
+ROW_PAD_BOT = 8
+LINE_GAP = 3
+RESULT_INDENT = 16
 BADGE_PAD_H = 6
 BADGE_GAP = 8
 SELECT_BAR_W = 2
@@ -131,7 +133,7 @@ def _scaled(base: QFont, factor: float) -> QFont:
 
 
 class HistoryDelegate(QStyledItemDelegate):
-    """`> expression` muted, then the result with its assignment badge."""
+    """Muted `expression`, then an accent `= ` leader and the result."""
 
     def __init__(self, palette: Palette) -> None:
         super().__init__()
@@ -155,7 +157,7 @@ class HistoryDelegate(QStyledItemDelegate):
             )
             painter.fillRect(bar_rect, QColor(p.accent))
 
-        rect = option.rect.adjusted(ROW_PAD_H, ROW_PAD_V, -ROW_PAD_H, -ROW_PAD_V)
+        rect = option.rect.adjusted(ROW_PAD_H, ROW_PAD_TOP, -ROW_PAD_H, -ROW_PAD_BOT)
         expression = index.data(EXPRESSION_ROLE) or ""
         result = index.data(RESULT_ROLE) or ""
         note = index.data(NOTE_ROLE) or ""
@@ -164,19 +166,35 @@ class HistoryDelegate(QStyledItemDelegate):
         expr_font = _scaled(option.font, 0.9)
         result_font = _scaled(option.font, 1.1)
         result_font.setBold(True)
+        leader_font = _scaled(option.font, 1.1)
         note_font = _scaled(option.font, 0.85)
         expr_h = QFontMetrics(expr_font).height()
         result_h = QFontMetrics(result_font).height()
 
         y = rect.top()
         painter.setFont(expr_font)
+        painter.setPen(QColor(p.muted))
         expr_rect = QRect(rect.left(), y, rect.width(), expr_h)
-        self._draw_highlighted(painter, expr_rect, expression)
+        painter.drawText(
+            expr_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, expression
+        )
         y += expr_h + LINE_GAP
 
-        result_rect = QRect(rect.left(), y, rect.width(), result_h)
+        result_rect = QRect(
+            rect.left() + RESULT_INDENT, y, rect.width() - RESULT_INDENT, result_h
+        )
         result_metrics = QFontMetrics(result_font)
         x = result_rect.left()
+
+        painter.setFont(leader_font)
+        painter.setPen(QColor(p.accent))
+        leader_w = QFontMetrics(leader_font).horizontalAdvance("= ")
+        painter.drawText(
+            QRect(x, result_rect.top(), leader_w, result_rect.height()),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            "= ",
+        )
+        x += leader_w
 
         name, display_result = split_assignment(result, prefix)
         if name:
@@ -203,43 +221,28 @@ class HistoryDelegate(QStyledItemDelegate):
             note_h = QFontMetrics(note_font).height()
             painter.setFont(note_font)
             painter.setPen(QColor(p.muted))
-            note_rect = QRect(rect.left(), y, rect.width(), note_h)
+            note_rect = QRect(rect.left() + RESULT_INDENT, y, rect.width() - RESULT_INDENT, note_h)
             painter.drawText(
                 note_rect,
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                 f"({note})",
             )
+
+        painter.setPen(QColor(p.hairline))
+        painter.drawLine(
+            option.rect.left() + ROW_PAD_H,
+            option.rect.bottom(),
+            option.rect.right() - ROW_PAD_H,
+            option.rect.bottom(),
+        )
         painter.restore()
-
-    def _draw_highlighted(self, painter: QPainter, rect: QRect, expression: str) -> None:
-        """Paint `> expression` with the same token colors as the input field."""
-        metrics = painter.fontMetrics()
-        flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        palette = self.palette_tokens
-        x = rect.left()
-
-        def draw(text: str, color: QColor) -> None:
-            nonlocal x
-            if not text:
-                return
-            painter.setPen(color)
-            painter.drawText(QRect(x, rect.top(), rect.right() - x, rect.height()), flags, text)
-            x += metrics.horizontalAdvance(text)
-
-        draw("> ", QColor(palette.muted))
-        pos = 0
-        for start, length, kind in classify(expression):
-            draw(expression[pos:start], QColor(palette.muted))  # whitespace/unlexed gaps
-            draw(expression[start : start + length], color_for(kind, palette))
-            pos = start + length
-        draw(expression[pos:], QColor(palette.muted))  # trailing unlexable rest
 
     def sizeHint(
         self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
     ) -> QSize:
         expr_h = QFontMetrics(_scaled(option.font, 0.9)).height()
         result_h = QFontMetrics(_scaled(option.font, 1.1)).height()
-        height = 2 * ROW_PAD_V + expr_h + LINE_GAP + result_h
+        height = ROW_PAD_TOP + ROW_PAD_BOT + expr_h + LINE_GAP + result_h
         if index.data(NOTE_ROLE):
             note_h = QFontMetrics(_scaled(option.font, 0.85)).height()
             height += LINE_GAP + note_h

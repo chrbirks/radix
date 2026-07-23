@@ -11,6 +11,9 @@ ambiguity to resolve about major/minor/patch.
 
 ### Changed
 
+- The history panel is redesigned as a grouped ledger: the input line now
+  recedes as muted text, an accent `= ` leader unmistakably marks the
+  result, and a hairline divider separates entries.
 - The data-trace green (asserted bits, syntax-highlighted numbers, IEEE-754
   exponent band) is now blue (`#0078FF`) in both themes.
 - "Cycle integer result base" and "toggle float view" moved from Alt+B /
