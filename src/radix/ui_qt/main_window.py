@@ -42,7 +42,7 @@ from radix.ui_qt.highlight import ExprHighlighter
 from radix.ui_qt.history_model import HistoryDelegate, HistoryEntry, HistoryModel
 from radix.ui_qt.input_edit import InputBar
 from radix.ui_qt.inspector import Inspector
-from radix.ui_qt.settings import app_settings, load_session, save_session
+from radix.ui_qt.settings import app_settings, load_session, load_state, save_session, save_state
 from radix.ui_qt.theme import LABEL_FAMILY, THEME_MODES, Palette, theme_mode_icon
 from radix.ui_qt.zones import ZoneCaption, margin_wrap
 
@@ -188,6 +188,7 @@ class MainWindow(QMainWindow):
         self.resize(600, 800)  # default size; replaced by restored geometry below
         if self.store is not None:
             load_session(self.session)
+            load_state(self.session)
             self._refresh_status()
             for old in self.store.load():
                 self.model.append(
@@ -322,12 +323,16 @@ class MainWindow(QMainWindow):
             self.input.clear()
             self._toast(f"deleted {outcome.target}")
             self._refresh_vars_pane()
+            if self.store is not None:
+                save_state(self.session)
             return
         if outcome.kind == "layout":
             self.input.clear()
             if outcome.target is not None:
                 self._toast(outcome.help_text or f"defined layout {outcome.target}")
                 self._refresh_vars_pane()
+                if self.store is not None:
+                    save_state(self.session)
             else:
                 self._show_vars()
             return
@@ -340,6 +345,8 @@ class MainWindow(QMainWindow):
             self.intview.show_value(None, self.session.word_size, self.session.signed)
             self.inspector.show_viz_payload(None)
             self._refresh_vars_pane()
+            if self.store is not None:
+                save_state(self.session)
             return
         if outcome.value is None:
             return
@@ -370,6 +377,7 @@ class MainWindow(QMainWindow):
                 prefix=prefix,
                 value=outcome.value.number if isinstance(outcome.value.number, int) else None,
             )
+            save_state(self.session)
         self.history_view.scrollToBottom()
         self.recall_index = None
         self.input.clear()

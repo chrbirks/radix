@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from radix.engine.errors import EvalError, Span
 from radix.engine.nodes import Binary, Literal, Name, Node, Slice
@@ -86,6 +87,22 @@ def layout_from_nodes(nodes: list[Node], name: str | None) -> RegLayout:
         built.append(RegField(field_name, msb, lsb))
     ordered = tuple(sorted(built, key=lambda f: -f.msb))
     return RegLayout(name, ordered)
+
+
+def layout_to_json(layout: RegLayout) -> dict[str, Any]:
+    """JSON-safe representation of a layout, for session persistence."""
+    return {
+        "name": layout.name,
+        "fields": [{"name": f.name, "msb": f.msb, "lsb": f.lsb} for f in layout.fields],
+    }
+
+
+def layout_from_json(data: dict[str, Any]) -> RegLayout:
+    """Inverse of ``layout_to_json``. Raises on malformed data."""
+    fields = tuple(
+        RegField(f["name"], f["msb"], f["lsb"]) for f in data["fields"]
+    )
+    return RegLayout(data["name"], fields)
 
 
 def format_field_value(field: RegField, value: int) -> str:

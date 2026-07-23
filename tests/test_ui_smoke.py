@@ -131,6 +131,50 @@ def test_result_readout_seeded_from_persisted_history(qtbot, tmp_path) -> None: 
     assert win2.result_label.property("dimmed") == "false"
 
 
+def test_variables_and_layouts_persist_across_restart(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+
+    win1 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "layout CTRL = EN[31] ADDR[27:8]")
+    _submit(qtbot, win1, "x = CTRL(0x8C01A0F3)")
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win2)
+    assert set(win2.session.layouts) == {"CTRL"}
+    assert win2.session.variables["x"].number == 0x8C01A0F3
+    assert win2.session.variables["x"].layout is not None
+    assert win2.session.variables["x"].layout.name == "CTRL"
+    assert win2.session.ans is not None
+    assert win2.session.ans.number == 0x8C01A0F3
+
+
+def test_clear_wipes_persisted_variables(qtbot, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from PySide6.QtCore import QSettings
+
+    from radix.history.store import HistoryStore
+
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    store = HistoryStore(tmp_path / "history.jsonl")
+
+    win1 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win1)
+    _submit(qtbot, win1, "x = 5")
+    _submit(qtbot, win1, "clear")
+    win1.close()
+
+    win2 = MainWindow(Session(), LIGHT, store=store)
+    qtbot.addWidget(win2)
+    assert win2.session.variables == {}
+    assert win2.session.layouts == {}
+
+
 def test_live_preview_shows_xor_and_result(qtbot, window: MainWindow) -> None:  # type: ignore[no-untyped-def]
     window.input.setText("2^10")
     window._update_preview()

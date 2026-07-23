@@ -9,6 +9,7 @@ evaluation is completely side-effect free, which is what the live preview uses:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from radix.engine import evaluator, render
 from radix.engine import fpga as _fpga  # noqa: F401 — registers the FPGA toolkit
@@ -23,11 +24,17 @@ from radix.engine.formatter import (
     integer_views,
 )
 from radix.engine.functions import CONSTANTS, FUNCTIONS, EvalContext
-from radix.engine.layouts import RegLayout, flatten_spec, layout_from_nodes
+from radix.engine.layouts import (
+    RegLayout,
+    flatten_spec,
+    layout_from_json,
+    layout_from_nodes,
+    layout_to_json,
+)
 from radix.engine.lexer import tokenize
 from radix.engine.nodes import Assign
 from radix.engine.parser import parse
-from radix.engine.values import Value
+from radix.engine.values import Value, value_from_json, value_to_json
 
 WORD_SIZES = (8, 16, 32, 64)
 NOTATIONS = ("auto", "sci", "eng", "eng_si")
@@ -249,5 +256,42 @@ class Session:
         """
         return self.evaluate(text, commit=False)
 
+    # -- persistence -------------------------------------------------------
+
+    def state_to_json(self) -> dict[str, Any]:
+        """Variables, layouts, and ``ans`` — the state that persists across restarts."""
+        return {
+            "variables": {name: value_to_json(v) for name, v in self.variables.items()},
+            "layouts": {name: layout_to_json(lyt) for name, lyt in self.layouts.items()},
+            "ans": value_to_json(self.ans) if self.ans is not None else None,
+        }
+
+    def load_state_json(self, data: dict[str, Any]) -> None:
+        """Inverse of ``state_to_json``. Skips individual malformed entries
+        rather than discarding the whole stored state."""
+        variables: dict[str, Value] = {}
+        for name, entry in data.get("variables", {}).items():
+            if name in RESERVED_NAMES:
+                continue
+            try:
+                variables[name] = value_from_json(entry)
+            except (KeyError, TypeError, ValueError):
+                continue
+        layouts: dict[str, RegLayout] = {}
+        for name, entry in data.get("layouts", {}).items():
+            if name in RESERVED_NAMES or name in variables:
+                continue
+            try:
+                layouts[name] = layout_from_json(entry)
+            except (KeyError, TypeError, ValueError):
+                continue
+        self.variables = variables
+        self.layouts = layouts
+        ans_data = data.get("ans")
+        if ans_data is not None:
+            try:
+                self.ans = value_from_json(ans_data)
+            except (KeyError, TypeError, ValueError):
+                self.ans = None
 
 __all__ = ["Session", "Outcome", "CalcError", "WORD_SIZES", "NOTATIONS", "INT_BASES"]

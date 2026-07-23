@@ -9,6 +9,8 @@ stored values silently keep the built-in defaults.
 
 from __future__ import annotations
 
+import json
+
 from PySide6.QtCore import QSettings
 
 from radix.session import INT_BASES, NOTATIONS, WORD_SIZES, Session
@@ -51,3 +53,22 @@ def save_session(session: Session) -> None:
     s.setValue("notation", session.notation)
     s.setValue("int_base", session.int_base)
     s.setValue("show_float_view", session.show_float_view)
+
+
+def load_state(session: Session) -> None:
+    """Apply persisted variables/layouts/ans. Corrupt or missing data leaves
+    the session at its (empty) defaults."""
+    blob = app_settings().value("calc_state")
+    if blob is None:
+        return
+    try:
+        data = json.loads(blob)
+    except (TypeError, ValueError):
+        return
+    if not isinstance(data, dict):
+        return
+    session.load_state_json(data)
+
+
+def save_state(session: Session) -> None:
+    app_settings().setValue("calc_state", json.dumps(session.state_to_json()))

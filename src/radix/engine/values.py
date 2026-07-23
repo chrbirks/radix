@@ -59,3 +59,46 @@ set_working_precision()
 def as_int_exact(n: Number) -> int | None:
     """Return the value as an exact int if it is one, else None (no coercion)."""
     return n if isinstance(n, int) else None
+
+
+def value_to_json(value: Value) -> dict[str, Any]:
+    """JSON-safe representation of a value, for session persistence.
+
+    ``mpf`` reals round-trip bit-exact via mpmath's internal
+    ``(sign, man, exp, bc)`` tuple — all plain ints, regardless of working
+    precision. ``viz`` is dropped: it's a transient display payload
+    recomputed by evaluation, not meaningful to freeze.
+    """
+    from radix.engine.layouts import layout_to_json
+
+    if isinstance(value.number, int):
+        number: dict[str, Any] = {"kind": "int", "value": value.number}
+    else:
+        number = {"kind": "real", "mpf": list(value.number._mpf_)}
+    return {
+        "number": number,
+        "declared_width": value.declared_width,
+        "prefer_si": value.prefer_si,
+        "note": value.note,
+        "layout": layout_to_json(value.layout) if value.layout is not None else None,
+    }
+
+
+def value_from_json(data: dict[str, Any]) -> Value:
+    """Inverse of ``value_to_json``. Raises on malformed data."""
+    from radix.engine.layouts import layout_from_json
+
+    number_data = data["number"]
+    number: Number
+    if number_data["kind"] == "int":
+        number = number_data["value"]
+    else:
+        number = mpmath.make_mpf(tuple(number_data["mpf"]))
+    layout_data = data["layout"]
+    return Value(
+        number=number,
+        declared_width=data["declared_width"],
+        prefer_si=data["prefer_si"],
+        note=data["note"],
+        layout=layout_from_json(layout_data) if layout_data is not None else None,
+    )

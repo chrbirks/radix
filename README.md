@@ -137,30 +137,31 @@ as hex/dec/bin, recall it, or delete it.
 
 All settings — word size, signedness, deg/rad, notation, result base,
 always-on-top, window geometry — persist across restarts in a plain INI file
-(`%APPDATA%\radix` on Windows, `~/.config/radix` on Linux).
+(`%APPDATA%\radix` on Windows, `~/.config/radix` on Linux). Variables, named
+`layout`s, and `ans` persist there too, and are restored on the next launch.
 
 ## Keyboard
 
-| Key | Action |
-| --- | --- |
-| Enter | evaluate |
-| Tab / Ctrl+Space | insert / open completions |
-| Up / Down | recall history (or navigate completions) |
-| Ctrl+L | clear the history view |
-| Ctrl+Shift+C | copy last result |
-| F1 or `help` | help pane (Esc dismisses) |
-| Alt+W / Alt+S | word size / signedness |
-| Alt+D / Alt+N | deg-rad / notation |
-| Alt+B | result base (dec/hex/bin) |
-| Alt+V | variables pane (`del <name>` removes) |
-| Alt+T | always on top |
-| Alt+I | show/hide the inspector panel |
-| Alt+M | cycle theme: auto (follows the OS) / light / dark |
-| Esc | dismiss help/variables pane, clear bit-range selection |
+| Key              | Action                                                 |
+|------------------|--------------------------------------------------------|
+| Enter            | evaluate                                               |
+| Tab / Ctrl+Space | insert / open completions                              |
+| Up / Down        | recall history (or navigate completions)               |
+| Ctrl+L           | clear the history view                                 |
+| Ctrl+Shift+C     | copy last result                                       |
+| F1 or `help`     | help pane (Esc dismisses)                              |
+| Alt+W / Alt+S    | word size / signedness                                 |
+| Alt+D / Alt+N    | deg-rad / notation                                     |
+| Alt+B            | result base (dec/hex/bin)                              |
+| Alt+V            | variables pane (`del <name>` removes)                  |
+| Alt+T            | always on top                                          |
+| Alt+I            | show/hide the inspector panel                          |
+| Alt+M            | cycle theme: auto (follows the OS) / light / dark      |
+| Esc              | dismiss help/variables pane, clear bit-range selection |
 
-`clear` wipes variables and persistent history. History is stored as JSONL in
-the platform user-data directory and recalled entries re-evaluate through the
-live engine.
+`clear` wipes variables, layouts, and persistent history. History is stored
+as JSONL in the platform user-data directory and recalled entries
+re-evaluate through the live engine.
 
 ## Development
 

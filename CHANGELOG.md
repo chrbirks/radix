@@ -19,6 +19,10 @@ ambiguity to resolve about major/minor/patch.
 
 ### Added
 
+- Variables, named `layout`s, and `ans` now persist across restarts in the
+  same INI file as the other settings, saved after every assign/`del`/
+  `layout`/`clear` so a crash doesn't lose them. `clear` also wipes the
+  saved copy.
 - Bash/readline-style line editing in the input field: Ctrl+B/F move the
   cursor by one character, Alt+B/F by one word, Ctrl+E jumps to end of
   line, Ctrl+D/H delete the char forward/backward, and Ctrl+W deletes the
